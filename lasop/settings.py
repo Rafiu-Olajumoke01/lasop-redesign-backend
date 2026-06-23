@@ -111,7 +111,9 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 ]
 
 CORS_ALLOWED_ORIGINS = [
-    "https://lasop-redesign-frontend.vercel.app",
+    "http://localhost:3000",
+    "https://lasop.net",
+    "https://www.lasop.net",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
