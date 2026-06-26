@@ -18,6 +18,9 @@ DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',')
 
+FLUTTERWAVE_SECRET_KEY = os.environ.get('FLUTTERWAVE_SECRET_KEY')
+FLUTTERWAVE_WEBHOOK_HASH = os.environ.get('FLUTTERWAVE_WEBHOOK_HASH')
+
 
 # Application definition
 
@@ -35,6 +38,7 @@ INSTALLED_APPS = [
     'users',
     'courses',
     'applications',
+    'payments',
 ]
 
 MIDDLEWARE = [
