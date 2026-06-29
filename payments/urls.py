@@ -3,7 +3,7 @@ from .views import (
     InitiatePaymentView,
     PaymentStatusView,
     ConfirmClickedView,
-    FlutterwaveWebhookView,
+    PaystackWebhookView,
 )
 
 urlpatterns = [
@@ -22,5 +22,5 @@ urlpatterns = [
         ConfirmClickedView.as_view(),
         name="payment-confirm-clicked",
     ),
-    path("payments/webhook/", FlutterwaveWebhookView.as_view(), name="payment-webhook"),
+    path("payments/webhook/", PaystackWebhookView.as_view(), name="payment-webhook"),
 ]

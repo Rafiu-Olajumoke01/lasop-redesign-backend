@@ -12,8 +12,8 @@ Three endpoints:
         -> student clicked "I have made payment" (does NOT mark as paid, just
            flips status to awaiting_confirmation so the UI can show "verifying")
 
-  POST /api/payments/webhook/   (no application_id - Flutterwave doesn't know our URLs)
-        -> Flutterwave calls this. THIS is the only place that marks a Payment as paid.
+  POST /api/payments/webhook/   (no application_id - Paystack doesn't know our URLs)
+        -> Paystack calls this. THIS is the only place that marks a Payment as paid.
 """
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -24,7 +24,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import get_object_or_404
 import logging
 
-from applications.models import Application  # adjust to your actual path
+from applications.models import Application
 from .models import Payment
 from . import paystack
 
@@ -37,8 +37,6 @@ class InitiatePaymentView(APIView):
     def post(self, request, application_id):
         application = get_object_or_404(Application, id=application_id, student=request.user)
 
-        # If there's already a live (non-expired, non-failed) payment, reuse it
-        # instead of spinning up a duplicate virtual account.
         existing = (
             application.payments
             .exclude(status__in=[Payment.Status.EXPIRED, Payment.Status.FAILED])
@@ -55,16 +53,15 @@ class InitiatePaymentView(APIView):
 
         try:
             result = paystack.create_virtual_account(
-                tx_ref=payment.tx_ref,
+                reference=payment.tx_ref,
                 amount=payment.amount,
                 email=request.user.email,
                 full_name=request.user.get_full_name() or request.user.email,
-                phone="",  # Application has no phone field; add one if you collect it
             )
-        except paystack.FlutterwaveError as e:
+        except paystack.PaystackError as e:
             payment.status = Payment.Status.FAILED
             payment.save(update_fields=["status"])
-            logger.error("Flutterwave virtual account creation failed: %s", e)
+            logger.error("Paystack virtual account creation failed: %s", e)
             return Response(
                 {"detail": "Could not initiate payment. Please try again shortly."},
                 status=http_status.HTTP_502_BAD_GATEWAY,
@@ -72,7 +69,7 @@ class InitiatePaymentView(APIView):
 
         payment.virtual_account_number = result["account_number"]
         payment.virtual_bank_name = result["bank_name"]
-        payment.flw_ref = result["flw_ref"]
+        payment.flw_ref = result["reference"]  # keeping flw_ref field name to avoid migration
         payment.save(update_fields=["virtual_account_number", "virtual_bank_name", "flw_ref"])
 
         return Response(self._serialize(payment), status=http_status.HTTP_201_CREATED)
@@ -135,11 +132,11 @@ class ConfirmClickedView(APIView):
         return Response({"status": payment.status})
 
 
-class FlutterwaveWebhookView(APIView):
+class PaystackWebhookView(APIView):
     """
-    Public endpoint - Flutterwave calls this directly, no user auth available.
-    Security comes from verifying the 'verif-hash' header + re-verifying the
-    transaction server-to-server (never trust the webhook body alone).
+    Public endpoint - Paystack calls this directly, no user auth available.
+    Security comes from verifying the 'x-paystack-signature' header + re-verifying
+    the transaction server-to-server (never trust the webhook body alone).
     """
     permission_classes = [AllowAny]
 
@@ -150,8 +147,7 @@ class FlutterwaveWebhookView(APIView):
             return Response(status=401)
 
         payload = request.data
-        tx_ref = payload.get("data", {}).get("tx_ref") or payload.get("txRef")
-        transaction_id = payload.get("data", {}).get("id")
+        tx_ref = payload.get("data", {}).get("reference")  # Paystack uses "reference"
 
         if not tx_ref:
             return Response(status=400)
@@ -164,19 +160,15 @@ class FlutterwaveWebhookView(APIView):
         payment.raw_webhook_payload = payload
         payment.save(update_fields=["raw_webhook_payload"])
 
-        # Re-verify with Flutterwave directly rather than trusting the payload as-is
-        verification = paystack.verify_transaction(transaction_id)
+        # Re-verify with Paystack directly rather than trusting the payload alone
+        verification = paystack.verify_transaction(tx_ref)
         verified_status = verification.get("data", {}).get("status")
-        verified_amount = verification.get("data", {}).get("amount")
+        verified_amount = verification.get("data", {}).get("amount")  # Paystack returns kobo
 
-        if verified_status == "successful" and float(verified_amount) >= float(payment.amount):
+        if verified_status == "success" and int(verified_amount) >= int(float(payment.amount) * 100):
             payment.status = Payment.Status.PAID
             payment.paid_at = timezone.now()
             payment.save(update_fields=["status", "paid_at"])
-            # Note: Application itself has no payment_status field — the Payment
-            # model above is the single source of truth for status. The dashboard
-            # should look up the latest Payment for an Application, not the
-            # Application itself, to know if it's paid.
         else:
             payment.status = Payment.Status.FAILED
             payment.save(update_fields=["status"])
