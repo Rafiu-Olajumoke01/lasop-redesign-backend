@@ -1,18 +1,16 @@
 """
 payments/views.py
 
-Three endpoints:
   POST /api/applications/<application_id>/payments/initiate/
-        -> creates a new Payment + virtual account, starts the 30 min timer
+        -> creates a new Payment, initializes Paystack transaction, returns authorization_url
 
   GET  /api/applications/<application_id>/payments/status/
         -> frontend polls this to know current payment status + seconds_remaining
 
   POST /api/applications/<application_id>/payments/confirm-clicked/
-        -> student clicked "I have made payment" (does NOT mark as paid, just
-           flips status to awaiting_confirmation so the UI can show "verifying")
+        -> student clicked "I have completed payment" — flips status to awaiting_confirmation
 
-  POST /api/payments/webhook/   (no application_id - Paystack doesn't know our URLs)
+  POST /api/payments/webhook/
         -> Paystack calls this. THIS is the only place that marks a Payment as paid.
 """
 from rest_framework.views import APIView
@@ -29,6 +27,8 @@ from .models import Payment
 from . import paystack
 
 logger = logging.getLogger(__name__)
+
+CALLBACK_URL = "https://lasop.net"
 
 
 class InitiatePaymentView(APIView):
@@ -53,25 +53,24 @@ class InitiatePaymentView(APIView):
         )
 
         try:
-            result = paystack.create_virtual_account(
+            result = paystack.initialize_transaction(
                 reference=payment.tx_ref,
                 amount=payment.amount,
                 email=request.user.email,
-                full_name=request.user.get_full_name() or request.user.email,
+                callback_url=CALLBACK_URL,
             )
         except paystack.PaystackError as e:
             payment.status = Payment.Status.FAILED
             payment.save(update_fields=["status"])
-            logger.error("Paystack virtual account creation failed: %s", e)
+            logger.error("Paystack transaction initialization failed: %s", e)
             return Response(
                 {"detail": "Could not initiate payment. Please try again shortly."},
                 status=http_status.HTTP_502_BAD_GATEWAY,
             )
 
-        payment.virtual_account_number = result["account_number"]
-        payment.virtual_bank_name = result["bank_name"]
-        payment.flw_ref = result["reference"]
-        payment.save(update_fields=["virtual_account_number", "virtual_bank_name", "flw_ref"])
+        # Store the authorization_url in flw_ref field to avoid new migration
+        payment.flw_ref = result["authorization_url"]
+        payment.save(update_fields=["flw_ref"])
 
         return Response(self._serialize(payment), status=http_status.HTTP_201_CREATED)
 
@@ -81,8 +80,7 @@ class InitiatePaymentView(APIView):
             "id": str(payment.id),
             "status": payment.status,
             "amount": str(payment.amount),
-            "account_number": payment.virtual_account_number,
-            "bank_name": payment.virtual_bank_name,
+            "authorization_url": payment.flw_ref,  # stored here to avoid migration
             "expires_at": payment.expires_at.isoformat(),
             "seconds_remaining": payment.seconds_remaining,
         }
@@ -104,15 +102,14 @@ class PaymentStatusView(APIView):
             "id": str(payment.id),
             "status": payment.status,
             "amount": str(payment.amount),
-            "account_number": payment.virtual_account_number,
-            "bank_name": payment.virtual_bank_name,
+            "authorization_url": payment.flw_ref,
             "expires_at": payment.expires_at.isoformat(),
             "seconds_remaining": payment.seconds_remaining,
         })
 
 
 class ConfirmClickedView(APIView):
-    """Student clicked 'I have made payment'. This only changes UI state —
+    """Student clicked 'I have completed payment'. This only changes UI state —
     it does NOT mark the payment as paid. The webhook is what marks it paid."""
     permission_classes = [IsAuthenticated]
 
@@ -136,8 +133,7 @@ class ConfirmClickedView(APIView):
 class PaystackWebhookView(APIView):
     """
     Public endpoint - Paystack calls this directly, no user auth available.
-    Security comes from verifying the 'x-paystack-signature' header + re-verifying
-    the transaction server-to-server (never trust the webhook body alone).
+    Security: verify 'x-paystack-signature' header + re-verify transaction server-to-server.
     """
     permission_classes = [AllowAny]
 
@@ -162,17 +158,16 @@ class PaystackWebhookView(APIView):
         payment = Payment.objects.filter(tx_ref=tx_ref).first()
         if not payment:
             logger.warning("Webhook for unknown tx_ref: %s", tx_ref)
-            return Response(status=200)  # Return 200 so Paystack doesn't keep retrying
+            return Response(status=200)
 
         payment.raw_webhook_payload = payload
         payment.save(update_fields=["raw_webhook_payload"])
 
-        # Re-verify with Paystack directly — never trust webhook payload alone
+        # Re-verify with Paystack directly
         verification = paystack.verify_transaction(tx_ref)
         verified_status = verification.get("data", {}).get("status")
         verified_amount = verification.get("data", {}).get("amount", 0)  # in kobo
 
-        # FIX: safe int conversion — verified_amount is already in kobo from Paystack
         try:
             amount_in_kobo = int(verified_amount)
             expected_kobo = int(float(payment.amount) * 100)
