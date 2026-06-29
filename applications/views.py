@@ -10,7 +10,10 @@ class ApplicationListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        applications = Application.objects.filter(student=request.user)
+        if request.user.is_staff:
+            applications = Application.objects.all().select_related('student', 'course')
+        else:
+            applications = Application.objects.filter(student=request.user)
         serializer = ApplicationSerializer(applications, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -27,7 +30,10 @@ class ApplicationDeleteView(APIView):
 
     def delete(self, request, pk):
         try:
-            application = Application.objects.get(pk=pk, student=request.user)
+            if request.user.is_staff:
+                application = Application.objects.get(pk=pk)
+            else:
+                application = Application.objects.get(pk=pk, student=request.user)
         except Application.DoesNotExist:
             return Response({'error': 'Application not found'}, status=status.HTTP_404_NOT_FOUND)
         application.delete()
