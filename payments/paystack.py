@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+from django.http import HttpRequest
 import requests
 from django.conf import settings
 
