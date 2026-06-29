@@ -37,6 +37,7 @@ class InitiatePaymentView(APIView):
     def post(self, request, application_id):
         application = get_object_or_404(Application, id=application_id, student=request.user)
 
+        # Return existing active payment if one exists and hasn't expired
         existing = (
             application.payments
             .exclude(status__in=[Payment.Status.EXPIRED, Payment.Status.FAILED])
@@ -69,7 +70,7 @@ class InitiatePaymentView(APIView):
 
         payment.virtual_account_number = result["account_number"]
         payment.virtual_bank_name = result["bank_name"]
-        payment.flw_ref = result["reference"]  # keeping flw_ref field name to avoid migration
+        payment.flw_ref = result["reference"]
         payment.save(update_fields=["virtual_account_number", "virtual_bank_name", "flw_ref"])
 
         return Response(self._serialize(payment), status=http_status.HTTP_201_CREATED)
@@ -147,7 +148,13 @@ class PaystackWebhookView(APIView):
             return Response(status=401)
 
         payload = request.data
-        tx_ref = payload.get("data", {}).get("reference")  # Paystack uses "reference"
+        event = payload.get("event", "")
+
+        # Only process successful charge events
+        if event not in ("charge.success", "transfer.success"):
+            return Response(status=200)
+
+        tx_ref = payload.get("data", {}).get("reference")
 
         if not tx_ref:
             return Response(status=400)
@@ -155,22 +162,35 @@ class PaystackWebhookView(APIView):
         payment = Payment.objects.filter(tx_ref=tx_ref).first()
         if not payment:
             logger.warning("Webhook for unknown tx_ref: %s", tx_ref)
-            return Response(status=404)
+            return Response(status=200)  # Return 200 so Paystack doesn't keep retrying
 
         payment.raw_webhook_payload = payload
         payment.save(update_fields=["raw_webhook_payload"])
 
-        # Re-verify with Paystack directly rather than trusting the payload alone
+        # Re-verify with Paystack directly — never trust webhook payload alone
         verification = paystack.verify_transaction(tx_ref)
         verified_status = verification.get("data", {}).get("status")
-        verified_amount = verification.get("data", {}).get("amount")  # Paystack returns kobo
+        verified_amount = verification.get("data", {}).get("amount", 0)  # in kobo
 
-        if verified_status == "success" and int(verified_amount) >= int(float(payment.amount) * 100):
+        # FIX: safe int conversion — verified_amount is already in kobo from Paystack
+        try:
+            amount_in_kobo = int(verified_amount)
+            expected_kobo = int(float(payment.amount) * 100)
+        except (ValueError, TypeError):
+            logger.error("Could not parse amounts for tx_ref: %s", tx_ref)
+            return Response(status=200)
+
+        if verified_status == "success" and amount_in_kobo >= expected_kobo:
             payment.status = Payment.Status.PAID
             payment.paid_at = timezone.now()
             payment.save(update_fields=["status", "paid_at"])
+            logger.info("Payment marked as PAID: %s", tx_ref)
         else:
             payment.status = Payment.Status.FAILED
             payment.save(update_fields=["status"])
+            logger.warning(
+                "Payment verification failed for %s — status: %s, amount: %s kobo (expected %s)",
+                tx_ref, verified_status, amount_in_kobo, expected_kobo
+            )
 
         return Response(status=200)

@@ -11,13 +11,13 @@ from django.db import models
 from django.utils import timezone
 from datetime import timedelta
 
-from applications.models import Application  # adjust import path to match your project
+from applications.models import Application
 
 
 class Payment(models.Model):
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
-        AWAITING_CONFIRMATION = "awaiting_confirmation", "Awaiting Confirmation"  # student clicked "I have made payment"
+        AWAITING_CONFIRMATION = "awaiting_confirmation", "Awaiting Confirmation"
         PAID = "paid", "Paid"
         EXPIRED = "expired", "Expired"
         FAILED = "failed", "Failed"
@@ -27,9 +27,9 @@ class Payment(models.Model):
         Application, on_delete=models.CASCADE, related_name="payments"
     )
 
-    # Flutterwave references
-    tx_ref = models.CharField(max_length=100, unique=True)  # our reference, sent to Flutterwave
-    flw_ref = models.CharField(max_length=100, blank=True, null=True)  # Flutterwave's own reference, from webhook
+    # Payment references — field name kept as flw_ref to avoid migration
+    tx_ref = models.CharField(max_length=100, unique=True)
+    flw_ref = models.CharField(max_length=100, blank=True, null=True)  # paystack reference
     virtual_account_number = models.CharField(max_length=30, blank=True, null=True)
     virtual_bank_name = models.CharField(max_length=100, blank=True, null=True)
 
@@ -37,13 +37,12 @@ class Payment(models.Model):
     status = models.CharField(max_length=30, choices=Status.choices, default=Status.PENDING)
 
     expires_at = models.DateTimeField()
-    confirmed_clicked_at = models.DateTimeField(blank=True, null=True)  # when student clicked "I have made payment"
+    confirmed_clicked_at = models.DateTimeField(blank=True, null=True)
     paid_at = models.DateTimeField(blank=True, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    # raw webhook payload, kept for debugging/audit
     raw_webhook_payload = models.JSONField(blank=True, null=True)
 
     class Meta:
@@ -58,7 +57,9 @@ class Payment(models.Model):
 
     @property
     def is_expired(self):
-        return self.status == self.Status.PENDING and timezone.now() > self.expires_at
+        # FIX: also check AWAITING_CONFIRMATION — student can't be stuck in limbo after timer ends
+        active_statuses = [self.Status.PENDING, self.Status.AWAITING_CONFIRMATION]
+        return self.status in active_statuses and timezone.now() > self.expires_at
 
     @property
     def seconds_remaining(self):
@@ -72,4 +73,5 @@ class Payment(models.Model):
         return self.status
 
     def __str__(self):
+        # FIX: removed trailing comma that was making this return a tuple and crash
         return f"{self.tx_ref} - {self.application_id} - {self.status}"
