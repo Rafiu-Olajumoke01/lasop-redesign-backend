@@ -26,7 +26,7 @@ import logging
 
 from applications.models import Application  # adjust to your actual path
 from .models import Payment
-from . import flutterwave
+from . import paystack
 
 logger = logging.getLogger(__name__)
 
@@ -54,14 +54,14 @@ class InitiatePaymentView(APIView):
         )
 
         try:
-            result = flutterwave.create_virtual_account(
+            result = paystack.create_virtual_account(
                 tx_ref=payment.tx_ref,
                 amount=payment.amount,
                 email=request.user.email,
                 full_name=request.user.get_full_name() or request.user.email,
                 phone="",  # Application has no phone field; add one if you collect it
             )
-        except flutterwave.FlutterwaveError as e:
+        except paystack.FlutterwaveError as e:
             payment.status = Payment.Status.FAILED
             payment.save(update_fields=["status"])
             logger.error("Flutterwave virtual account creation failed: %s", e)
@@ -145,7 +145,7 @@ class FlutterwaveWebhookView(APIView):
 
     @csrf_exempt
     def post(self, request):
-        if not flutterwave.verify_webhook_signature(request):
+        if not paystack.verify_webhook_signature(request):
             logger.warning("Rejected webhook with invalid signature")
             return Response(status=401)
 
@@ -165,7 +165,7 @@ class FlutterwaveWebhookView(APIView):
         payment.save(update_fields=["raw_webhook_payload"])
 
         # Re-verify with Flutterwave directly rather than trusting the payload as-is
-        verification = flutterwave.verify_transaction(transaction_id)
+        verification = paystack.verify_transaction(transaction_id)
         verified_status = verification.get("data", {}).get("status")
         verified_amount = verification.get("data", {}).get("amount")
 
