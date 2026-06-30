@@ -4,6 +4,9 @@ from .views import (
     PaymentStatusView,
     ConfirmClickedView,
     PaystackWebhookView,
+    ManualInitiatePaymentView,
+    ManualConfirmClickedView,
+    AdminConfirmPaymentView,
 )
 
 urlpatterns = [
@@ -21,6 +24,21 @@ urlpatterns = [
         "applications/<int:application_id>/payments/confirm-clicked/",
         ConfirmClickedView.as_view(),
         name="payment-confirm-clicked",
+    ),
+    path(
+        "applications/<int:application_id>/payments/manual/initiate/",
+        ManualInitiatePaymentView.as_view(),
+        name="payment-manual-initiate",
+    ),
+    path(
+        "applications/<int:application_id>/payments/manual/confirm-clicked/",
+        ManualConfirmClickedView.as_view(),
+        name="payment-manual-confirm-clicked",
+    ),
+    path(
+        "applications/<int:application_id>/payments/admin-confirm/",
+        AdminConfirmPaymentView.as_view(),
+        name="payment-admin-confirm",
     ),
     path("payments/webhook/", PaystackWebhookView.as_view(), name="payment-webhook"),
 ]

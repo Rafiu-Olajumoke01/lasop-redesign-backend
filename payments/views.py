@@ -1,18 +1,4 @@
-"""
-payments/views.py
 
-  POST /api/applications/<application_id>/payments/initiate/
-        -> creates a new Payment, initializes Paystack transaction, returns authorization_url
-
-  GET  /api/applications/<application_id>/payments/status/
-        -> frontend polls this to know current payment status + seconds_remaining
-
-  POST /api/applications/<application_id>/payments/confirm-clicked/
-        -> student clicked "I have completed payment" — flips status to awaiting_confirmation
-
-  POST /api/payments/webhook/
-        -> Paystack calls this. THIS is the only place that marks a Payment as paid.
-"""
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status as http_status
@@ -20,6 +6,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import get_object_or_404
+from rest_framework.permissions import IsAdminUser
 import logging
 
 from applications.models import Application
@@ -189,3 +176,110 @@ class PaystackWebhookView(APIView):
             )
 
         return Response(status=200)
+    
+
+class ManualInitiatePaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, application_id):
+        application = get_object_or_404(Application, id=application_id, student=request.user)
+
+        payment_type = request.data.get("payment_type")
+        amount = request.data.get("amount")
+
+        if payment_type not in (Payment.PaymentType.FULL, Payment.PaymentType.PART):
+            return Response({"detail": "Invalid payment_type."}, status=400)
+
+        try:
+            amount = float(amount)
+        except (TypeError, ValueError):
+            return Response({"detail": "Invalid amount."}, status=400)
+
+        if amount <= 0:
+            return Response({"detail": "Amount must be greater than 0."}, status=400)
+
+        if payment_type == Payment.PaymentType.FULL and amount < float(application.course.fee):
+            return Response(
+                {"detail": "Full payment amount cannot be less than the course fee."},
+                status=400,
+            )
+
+        payment = Payment.objects.create(
+            application=application,
+            amount=amount,
+            method=Payment.Method.MANUAL,
+            payment_type=payment_type,
+            status=Payment.Status.PENDING,
+        )
+
+        return Response({
+            "id": str(payment.id),
+            "status": payment.status,
+            "amount": str(payment.amount),
+            "payment_type": payment.payment_type,
+        }, status=201)
+
+
+class ManualConfirmClickedView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, application_id):
+        application = get_object_or_404(Application, id=application_id, student=request.user)
+
+        payment = (
+            application.payments
+            .filter(method=Payment.Method.MANUAL, status=Payment.Status.PENDING)
+            .order_by("-created_at")
+            .first()
+        )
+
+        if not payment:
+            return Response(
+                {"detail": "No pending manual payment found. Please start again."},
+                status=404,
+            )
+
+        payment.status = Payment.Status.AWAITING_CONFIRMATION
+        payment.confirmed_clicked_at = timezone.now()
+        payment.save(update_fields=["status", "confirmed_clicked_at"])
+
+        return Response({"status": payment.status})
+    
+class AdminConfirmPaymentView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def post(self, request, application_id):
+        application = get_object_or_404(Application, id=application_id)
+
+        payment = (
+            application.payments
+            .exclude(status=Payment.Status.PAID)
+            .order_by("-created_at")
+            .first()
+        )
+
+        if not payment:
+            return Response({"detail": "No unpaid payment found for this application."}, status=404)
+
+        confirmed_amount = request.data.get("confirmed_amount")
+        if confirmed_amount is not None:
+            try:
+                confirmed_amount = float(confirmed_amount)
+            except (TypeError, ValueError):
+                return Response({"detail": "Invalid confirmed_amount."}, status=400)
+        else:
+            confirmed_amount = float(payment.amount)
+
+        payment.status = Payment.Status.PAID
+        payment.confirmed_amount = confirmed_amount
+        payment.paid_at = timezone.now()
+        payment.reviewed_by = request.user
+        payment.reviewed_at = timezone.now()
+        payment.save(update_fields=[
+            "status", "confirmed_amount", "paid_at", "reviewed_by", "reviewed_at",
+        ])
+
+        return Response({
+            "status": payment.status,
+            "confirmed_amount": str(payment.confirmed_amount),
+        })
