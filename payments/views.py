@@ -204,13 +204,33 @@ class ManualInitiatePaymentView(APIView):
                 status=400,
             )
 
-        payment = Payment.objects.create(
-            application=application,
-            amount=amount,
-            method=Payment.Method.MANUAL,
-            payment_type=payment_type,
-            status=Payment.Status.PENDING,
+        # Reuse an existing pending/in-review manual payment instead of
+        # creating a duplicate row if the student re-opens "Pay Now"
+        # before admin has confirmed their first attempt.
+        existing = (
+            application.payments
+            .filter(
+                method=Payment.Method.MANUAL,
+                status__in=[Payment.Status.PENDING, Payment.Status.AWAITING_CONFIRMATION],
+            )
+            .order_by("-created_at")
+            .first()
         )
+
+        if existing:
+            existing.amount = amount
+            existing.payment_type = payment_type
+            existing.status = Payment.Status.PENDING
+            existing.save(update_fields=["amount", "payment_type", "status"])
+            payment = existing
+        else:
+            payment = Payment.objects.create(
+                application=application,
+                amount=amount,
+                method=Payment.Method.MANUAL,
+                payment_type=payment_type,
+                status=Payment.Status.PENDING,
+            )
 
         return Response({
             "id": str(payment.id),
