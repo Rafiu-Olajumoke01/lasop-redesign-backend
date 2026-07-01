@@ -32,8 +32,13 @@ class Course(models.Model):
     modules = models.JSONField(default=list)
     locations = models.ManyToManyField(Location, blank=True, related_name='courses')
 
+    order = models.PositiveIntegerField(default=100, help_text="Lower numbers appear first")
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['order', 'id']
 
     def __str__(self):
         return self.title
