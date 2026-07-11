@@ -29,6 +29,7 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     phone_number = models.CharField(max_length=15)
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES)
+    is_tutor = models.BooleanField(default=False)
 
     groups = models.ManyToManyField(
         'auth.Group',
