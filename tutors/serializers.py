@@ -35,12 +35,7 @@ class TutorSerializer(serializers.ModelSerializer):
 
 
 class TutorCreateSerializer(serializers.ModelSerializer):
-    """
-    Admin-only. Creates the User account AND the Tutor profile together,
-    in one step, since tutors do not self-register.
-    Admin provides the tutor's name, email, and an initial password,
-    which they then pass on to the tutor.
-    """
+    
     first_name = serializers.CharField(write_only=True)
     last_name = serializers.CharField(write_only=True)
     email = serializers.EmailField(write_only=True)
@@ -69,6 +64,7 @@ class TutorCreateSerializer(serializers.ModelSerializer):
         email = validated_data.pop('email')
         phone_number = validated_data.pop('phone_number', '')
         password = validated_data.pop('password')
+        cohorts = validated_data.pop('cohorts', [])  # <-- pull cohorts out first
 
         user = User.objects.create_user(
             email=email,
@@ -79,7 +75,9 @@ class TutorCreateSerializer(serializers.ModelSerializer):
             is_tutor=True,
         )
 
-        tutor = Tutor.objects.create(user=user, **validated_data)
+        tutor = Tutor.objects.create(user=user, **validated_data) 
+        if cohorts:
+            tutor.cohorts.set(cohorts)  
         return tutor
 
 
