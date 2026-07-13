@@ -30,15 +30,10 @@ class Tutor(models.Model):
 
     @property
     def cohorts_completed(self):
-        # Uses current_stage (auto-calculated from dates) instead of the
-        # manual `status` field, since nothing in the codebase ever updates
-        # `status` after a cohort is created.
         return sum(1 for c in self.cohorts.all() if c.current_stage == 'completed')
 
     @property
     def cohorts_ongoing(self):
-        # Same reasoning as above — any cohort currently in stage_1, stage_2,
-        # or stage_3 counts as "ongoing".
         return sum(
             1 for c in self.cohorts.all()
             if c.current_stage in ['stage_1', 'stage_2', 'stage_3']

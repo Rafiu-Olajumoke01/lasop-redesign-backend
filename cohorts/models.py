@@ -70,3 +70,45 @@ class Cohort(models.Model):
         elif days_in < 180:
             return 180 - days_in
         return 0
+
+class ClassSession(models.Model):
+    cohort = models.ForeignKey(Cohort, on_delete=models.CASCADE, related_name='class_sessions')
+    tutor = models.ForeignKey('tutors.Tutor', on_delete=models.SET_NULL, null=True, related_name='class_sessions')
+    topic = models.CharField(max_length=255, blank=True)
+    date = models.DateField()
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date', '-start_time']
+
+    def __str__(self):
+        return f"{self.cohort.name} — {self.date}"
+
+    @property
+    def duration_hours(self):
+        from datetime import datetime
+        start = datetime.combine(self.date, self.start_time)
+        end = datetime.combine(self.date, self.end_time)
+        return round((end - start).seconds / 3600, 2)
+
+    @property
+    def roster(self):
+        """Students expected at this session — pulled from the cohort's applications."""
+        return self.cohort.applications.select_related('student').all()
+
+
+class Attendance(models.Model):
+    STATUS_CHOICES = [('present', 'Present'), ('absent', 'Absent'), ('late', 'Late')]
+
+    session = models.ForeignKey(ClassSession, on_delete=models.CASCADE, related_name='attendance_records')
+    application = models.ForeignKey('applications.Application', on_delete=models.CASCADE, related_name='attendance_records')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='present')
+    marked_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('session', 'application')
+
+    def __str__(self):
+        return f"{self.application.student} — {self.session.date} — {self.status}"
