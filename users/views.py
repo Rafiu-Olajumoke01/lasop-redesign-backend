@@ -49,7 +49,7 @@ class StudentListView(APIView):
     permission_classes = [IsAdminUser]
 
     def get(self, request):
-        students = User.objects.filter(is_tutor=False).order_by('first_name', 'last_name')
+        students = User.objects.filter(is_tutor=False, is_staff=False).order_by('first_name', 'last_name')
         serializer = UserSerializer(students, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
