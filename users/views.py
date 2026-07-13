@@ -2,8 +2,10 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from .serializers import RegisterSerializer, LoginSerializer, UserSerializer
+from .models import User
+from tutors.models import Tutor
 
 
 class RegisterView(APIView):
@@ -38,4 +40,41 @@ class ProfileView(APIView):
 
     def get(self, request):
         serializer = UserSerializer(request.user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class StudentListView(APIView):
+    """Admin-only: list every student (User where is_tutor=False),
+    regardless of how they enrolled (website signup or manually added)."""
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        students = User.objects.filter(is_tutor=False).order_by('first_name', 'last_name')
+        serializer = UserSerializer(students, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AssignTutorView(APIView):
+    """Admin-only: assign (or unassign) a tutor for a given student."""
+    permission_classes = [IsAdminUser]
+
+    def patch(self, request, user_id):
+        try:
+            student = User.objects.get(id=user_id, is_tutor=False)
+        except User.DoesNotExist:
+            return Response({'error': 'Student not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        tutor_id = request.data.get('assigned_tutor', None)
+
+        if tutor_id in (None, '', 'null'):
+            student.assigned_tutor = None
+        else:
+            try:
+                tutor = Tutor.objects.get(id=tutor_id)
+            except Tutor.DoesNotExist:
+                return Response({'error': 'Tutor not found'}, status=status.HTTP_404_NOT_FOUND)
+            student.assigned_tutor = tutor
+
+        student.save()
+        serializer = UserSerializer(student)
         return Response(serializer.data, status=status.HTTP_200_OK)

@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 from .models import User
+from tutors.models import Tutor
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -34,7 +35,32 @@ class LoginSerializer(serializers.Serializer):
         return user
 
 
+class AssignedTutorSerializer(serializers.ModelSerializer):
+    """Small nested representation of a Tutor, shown inside a student's data
+    so the frontend can display who a student's tutor is without a second
+    API call."""
+    name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Tutor
+        fields = ['id', 'name']
+
+    def get_name(self, obj):
+        u = obj.user
+        full = f"{u.first_name} {u.last_name}".strip()
+        return full or u.email
+
+
 class UserSerializer(serializers.ModelSerializer):
+    # Read-only nested tutor info (for display)
+    assigned_tutor_detail = AssignedTutorSerializer(source='assigned_tutor', read_only=True)
+
     class Meta:
         model = User
-        fields = ['id', 'first_name', 'last_name', 'email', 'phone_number', 'gender', 'is_staff', 'is_tutor']
+        fields = [
+            'id', 'first_name', 'last_name', 'email', 'phone_number', 'gender',
+            'is_staff', 'is_tutor', 'assigned_tutor', 'assigned_tutor_detail',
+        ]
+        extra_kwargs = {
+            'assigned_tutor': {'write_only': True, 'required': False},
+        }
