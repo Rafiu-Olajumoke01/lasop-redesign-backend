@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions
 from .models import Cohort
 from .serializers import CohortSerializer
@@ -6,6 +7,11 @@ from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from exams.models import Exam
 from results.models import Result
+from .models import ClassSession, Attendance
+from .serializers import ClassSessionSerializer, AttendanceSerializer, AttendanceStudentSerializer
+from tutors.permissions import IsTutor
+from django.shortcuts import get_object_or_404
+from tutors.permissions import IsTutor
 
 
 class IsStaffOrReadOnly(permissions.BasePermission):
@@ -63,3 +69,45 @@ class DashboardStatsView(APIView):
             },
         }
         return Response(data)
+
+class TutorClassSessionListCreateView(generics.ListCreateAPIView):
+    serializer_class = ClassSessionSerializer
+    permission_classes = [IsTutor]
+
+    def get_queryset(self):
+        return ClassSession.objects.filter(tutor__user=self.request.user)
+
+    def perform_create(self, serializer):
+        tutor = self.request.user.tutor_profile
+        serializer.save(tutor=tutor)
+
+
+class SessionRosterView(APIView):
+    """Returns the expected student roster for a session, so the tutor
+    can mark attendance against it."""
+    permission_classes = [IsTutor]
+
+    def get(self, request, session_id):
+        session = get_object_or_404(ClassSession, id=session_id, tutor__user=request.user)
+        roster = session.roster
+        data = AttendanceStudentSerializer(roster, many=True).data
+        return Response(data)
+
+
+class BulkAttendanceView(APIView):
+    """POST a list of {application: id, status: 'present'|'absent'|'late'}
+    for a given session. Matches your existing bulk-attendance POST pattern."""
+    permission_classes = [IsTutor]
+
+    def post(self, request, session_id):
+        session = get_object_or_404(ClassSession, id=session_id, tutor__user=request.user)
+        records = request.data.get('records', [])
+        created = []
+        for r in records:
+            obj, _ = Attendance.objects.update_or_create(
+                session=session,
+                application_id=r['application'],
+                defaults={'status': r['status']},
+            )
+            created.append(obj)
+        return Response(AttendanceSerializer(created, many=True).data)
