@@ -30,6 +30,13 @@ class User(AbstractUser):
     phone_number = models.CharField(max_length=15)
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES)
     is_tutor = models.BooleanField(default=False)
+    assigned_tutor = models.ForeignKey(
+        'tutors.Tutor',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='students'
+    )
 
     groups = models.ManyToManyField(
         'auth.Group',
