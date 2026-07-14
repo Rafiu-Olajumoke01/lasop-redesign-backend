@@ -32,8 +32,8 @@ class ClassSessionSerializer(serializers.ModelSerializer):
     class Meta:
         model = ClassSession
         fields = [
-            'id', 'cohort', 'cohort_name', 'tutor', 'topic',
-            'date', 'start_time', 'end_time', 'duration_hours', 'created_at',
+        'id', 'cohort', 'cohort_name', 'tutor', 'topics_covered',
+        'date', 'start_time', 'end_time', 'duration_hours', 'created_at',
         ]
         extra_kwargs = {'tutor': {'required': False}}
 

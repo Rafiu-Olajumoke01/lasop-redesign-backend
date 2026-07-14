@@ -74,7 +74,10 @@ class Cohort(models.Model):
 class ClassSession(models.Model):
     cohort = models.ForeignKey(Cohort, on_delete=models.CASCADE, related_name='class_sessions')
     tutor = models.ForeignKey('tutors.Tutor', on_delete=models.SET_NULL, null=True, related_name='class_sessions')
-    topic = models.CharField(max_length=255, blank=True)
+    topics_covered = models.TextField(
+    blank=True,
+    help_text="Topics covered in this session — one per line, or comma-separated"
+)
     date = models.DateField()
     start_time = models.TimeField()
     end_time = models.TimeField()
