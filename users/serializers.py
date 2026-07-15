@@ -64,3 +64,19 @@ class UserSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'assigned_tutor': {'write_only': True, 'required': False},
         }
+
+class StudentDetailSerializer(UserSerializer):
+    certificate = serializers.SerializerMethodField()
+
+    class Meta(UserSerializer.Meta):
+        fields = UserSerializer.Meta.fields + ['certificate']
+
+    def get_certificate(self, obj):
+        # Local import avoids a circular import between users <-> certificate
+        from certificate.models import Certificate
+        from certificate.serializers import CertificateSerializer
+
+        cert = Certificate.objects.filter(student=obj).first()
+        if not cert:
+            return None
+        return CertificateSerializer(cert, context=self.context).data

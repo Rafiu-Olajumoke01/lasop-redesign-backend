@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
-from .serializers import RegisterSerializer, LoginSerializer, UserSerializer
+from .serializers import RegisterSerializer, LoginSerializer, UserSerializer, StudentDetailSerializer
 from .models import User
 from tutors.models import Tutor
 
@@ -77,4 +77,17 @@ class AssignTutorView(APIView):
 
         student.save()
         serializer = UserSerializer(student)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class StudentDetailView(APIView):
+    """Admin-only: full details of a single student, including certificate status."""
+    permission_classes = [IsAdminUser]
+
+    def get(self, request, user_id):
+        try:
+            student = User.objects.get(id=user_id, is_tutor=False, is_staff=False)
+        except User.DoesNotExist:
+            return Response({'error': 'Student not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = StudentDetailSerializer(student, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)

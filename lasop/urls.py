@@ -13,6 +13,7 @@ urlpatterns = [
     path('api/exams/', include('exams.urls')),
     path('api/results/', include('results.urls')),
     path('api/tutors/', include('tutors.urls')),
+    path('api/certificate/', include('certificate.urls')),
     path('api/', include('payments.urls')),
     re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
