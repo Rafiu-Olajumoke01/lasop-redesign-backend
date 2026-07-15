@@ -26,8 +26,21 @@ class ApplicationListCreateView(APIView):
 
 
 class ApplicationDetailView(APIView):
-    """Handles PATCH (staff-only, e.g. assigning cohort) and DELETE (staff or owning student) for a single application."""
+    """Handles GET (single application), PATCH (staff-only, e.g. assigning cohort),
+    and DELETE (staff or owning student) for a single application."""
     permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        try:
+            if request.user.is_staff:
+                application = Application.objects.get(pk=pk)
+            else:
+                application = Application.objects.get(pk=pk, student=request.user)
+        except Application.DoesNotExist:
+            return Response({'error': 'Application not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = ApplicationSerializer(application)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     def patch(self, request, pk):
         if not request.user.is_staff:
