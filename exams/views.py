@@ -14,9 +14,18 @@ class IsStaffOrReadOnly(permissions.BasePermission):
 
 
 class ExamListCreateView(generics.ListCreateAPIView):
-    queryset = Exam.objects.all()
     serializer_class = ExamSerializer
     permission_classes = [IsStaffOrReadOnly]
+
+    def get_queryset(self):
+        qs = Exam.objects.select_related('cohort', 'course').all()
+        cohort_id = self.request.query_params.get('cohort')
+        course_id = self.request.query_params.get('course')
+        if cohort_id:
+            qs = qs.filter(cohort_id=cohort_id)
+        if course_id:
+            qs = qs.filter(course_id=course_id)
+        return qs
 
 
 class ExamDetailView(generics.RetrieveUpdateDestroyAPIView):
