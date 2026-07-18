@@ -7,6 +7,7 @@ from .views import (
     ManualInitiatePaymentView,
     ManualConfirmClickedView,
     AdminConfirmPaymentView,
+    AdminPromoCodeListCreateView,
 )
 
 urlpatterns = [
@@ -41,4 +42,6 @@ urlpatterns = [
         name="payment-admin-confirm",
     ),
     path("payments/webhook/", PaystackWebhookView.as_view(), name="payment-webhook"),
+
+    path('promo-codes/', AdminPromoCodeListCreateView.as_view(), name='promo-code-list-create'),
 ]

@@ -68,4 +68,5 @@ class ApplicationSerializer(serializers.ModelSerializer):
             "amount": str(payment.amount),
             "confirmed_amount": str(payment.confirmed_amount) if payment.confirmed_amount else None,
             "created_at": payment.created_at.isoformat(),
+            "promo_code": payment.promo_code.code if payment.promo_code else None,
         }

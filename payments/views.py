@@ -8,6 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAdminUser
 import logging
+from .models import PromoCode
 
 from applications.models import Application
 from .models import Payment
@@ -178,6 +179,7 @@ class PaystackWebhookView(APIView):
         return Response(status=200)
     
 
+
 class ManualInitiatePaymentView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -186,6 +188,7 @@ class ManualInitiatePaymentView(APIView):
 
         payment_type = request.data.get("payment_type")
         amount = request.data.get("amount")
+        promo_code_input = (request.data.get("promo_code") or "").strip().upper()
 
         if payment_type not in (Payment.PaymentType.FULL, Payment.PaymentType.PART):
             return Response({"detail": "Invalid payment_type."}, status=400)
@@ -198,15 +201,30 @@ class ManualInitiatePaymentView(APIView):
         if amount <= 0:
             return Response({"detail": "Amount must be greater than 0."}, status=400)
 
-        if payment_type == Payment.PaymentType.FULL and amount < float(application.course.fee):
+        course_fee = float(application.course.fee)
+        promo_code = None
+
+        # Validate promo code if one was sent
+        if promo_code_input:
+            promo_code = PromoCode.objects.filter(code=promo_code_input, is_active=True).first()
+            if not promo_code:
+                return Response({"detail": "Invalid or inactive promo code."}, status=400)
+
+        # Recalculate the "true" fee server-side — never trust frontend's discounted amount
+        if promo_code:
+            discount_multiplier = 1 - (float(promo_code.discount_percent) / 100)
+            true_full_fee = round(course_fee * discount_multiplier, 2)
+        else:
+            true_full_fee = course_fee
+
+        if payment_type == Payment.PaymentType.FULL and amount < true_full_fee:
             return Response(
                 {"detail": "Full payment amount cannot be less than the course fee."},
                 status=400,
             )
 
-        # Reuse an existing pending/in-review manual payment instead of
-        # creating a duplicate row if the student re-opens "Pay Now"
-        # before admin has confirmed their first attempt.
+        # For part payment, cap check still uses the (possibly discounted) full fee as the ceiling reference if you want — currently no upper bound enforced, matching your original behavior.
+
         existing = (
             application.payments
             .filter(
@@ -221,7 +239,8 @@ class ManualInitiatePaymentView(APIView):
             existing.amount = amount
             existing.payment_type = payment_type
             existing.status = Payment.Status.PENDING
-            existing.save(update_fields=["amount", "payment_type", "status"])
+            existing.promo_code = promo_code
+            existing.save(update_fields=["amount", "payment_type", "status", "promo_code"])
             payment = existing
         else:
             payment = Payment.objects.create(
@@ -230,6 +249,7 @@ class ManualInitiatePaymentView(APIView):
                 method=Payment.Method.MANUAL,
                 payment_type=payment_type,
                 status=Payment.Status.PENDING,
+                promo_code=promo_code,
             )
 
         return Response({
@@ -237,7 +257,11 @@ class ManualInitiatePaymentView(APIView):
             "status": payment.status,
             "amount": str(payment.amount),
             "payment_type": payment.payment_type,
+            "promo_code": promo_code.code if promo_code else None,
+            "discount_percent": str(promo_code.discount_percent) if promo_code else None,
+            "full_fee_after_discount": str(true_full_fee),
         }, status=201)
+
 
 
 class ManualConfirmClickedView(APIView):
@@ -264,6 +288,53 @@ class ManualConfirmClickedView(APIView):
         payment.save(update_fields=["status", "confirmed_clicked_at"])
 
         return Response({"status": payment.status})
+    
+class AdminPromoCodeListCreateView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request):
+        codes = PromoCode.objects.all().order_by("-created_at")
+        return Response([
+            {
+                "id": c.id,
+                "code": c.code,
+                "discount_percent": str(c.discount_percent),
+                "is_active": c.is_active,
+                "created_at": c.created_at.isoformat(),
+            }
+            for c in codes
+        ])
+
+    def post(self, request):
+        code = (request.data.get("code") or "").strip().upper()
+        discount_percent = request.data.get("discount_percent", 15)
+
+        if not code:
+            return Response({"detail": "Code is required."}, status=400)
+
+        if PromoCode.objects.filter(code=code).exists():
+            return Response({"detail": "This code already exists."}, status=400)
+
+        try:
+            discount_percent = float(discount_percent)
+        except (TypeError, ValueError):
+            return Response({"detail": "Invalid discount_percent."}, status=400)
+
+        if discount_percent <= 0 or discount_percent > 100:
+            return Response({"detail": "discount_percent must be between 0 and 100."}, status=400)
+
+        promo = PromoCode.objects.create(
+            code=code,
+            discount_percent=discount_percent,
+            created_by=request.user,
+        )
+
+        return Response({
+            "id": promo.id,
+            "code": promo.code,
+            "discount_percent": str(promo.discount_percent),
+            "is_active": promo.is_active,
+        }, status=201)
     
 class AdminConfirmPaymentView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
@@ -303,3 +374,4 @@ class AdminConfirmPaymentView(APIView):
             "status": payment.status,
             "confirmed_amount": str(payment.confirmed_amount),
         })
+

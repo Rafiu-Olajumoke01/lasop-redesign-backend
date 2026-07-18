@@ -1,12 +1,3 @@
-"""
-payments/models.py
-
-A Payment record is created each time a student initiates a payment
-(either via Paystack card payment, or manual bank transfer) for an
-Application. Re-initiating (after expiry) creates a NEW Payment row
-rather than mutating the old one, so you keep a full audit trail of every
-attempt.
-"""
 import uuid
 from django.db import models
 from django.utils import timezone
@@ -14,6 +5,24 @@ from django.conf import settings
 from datetime import timedelta
 
 from applications.models import Application
+
+
+class PromoCode(models.Model):
+    code = models.CharField(max_length=30, unique=True)
+    discount_percent = models.DecimalField(max_digits=5, decimal_places=2, default=15)
+    is_active = models.BooleanField(default=True)
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="promo_codes_created",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.code
 
 
 class Payment(models.Model):
@@ -36,6 +45,13 @@ class Payment(models.Model):
     application = models.ForeignKey(
         Application, on_delete=models.CASCADE, related_name="payments"
     )
+    promo_code = models.ForeignKey(
+        PromoCode,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="payments",
+    )
 
     # Payment references — field name kept as flw_ref to avoid migration
     tx_ref = models.CharField(max_length=100, unique=True)
@@ -53,8 +69,7 @@ class Payment(models.Model):
         max_length=10, choices=PaymentType.choices, default=PaymentType.FULL
     )
 
-    # What admin actually confirms was received — may differ from `amount`
-    # if finance confirms a different figure than the student declared.
+    
     confirmed_amount = models.DecimalField(
         max_digits=12, decimal_places=2, blank=True, null=True
     )
@@ -88,7 +103,7 @@ class Payment(models.Model):
 
     @property
     def is_expired(self):
-        # FIX: also check AWAITING_CONFIRMATION — student can't be stuck in limbo after timer ends
+        
         active_statuses = [self.Status.PENDING, self.Status.AWAITING_CONFIRMATION]
         return self.status in active_statuses and timezone.now() > self.expires_at
 
@@ -108,5 +123,5 @@ class Payment(models.Model):
         return self.status
 
     def __str__(self):
-        # FIX: removed trailing comma that was making this return a tuple and crash
+       
         return f"{self.tx_ref} - {self.application_id} - {self.status}"
