@@ -217,11 +217,10 @@ class ManualInitiatePaymentView(APIView):
         else:
             true_full_fee = course_fee
 
-        if payment_type == Payment.PaymentType.FULL and amount < true_full_fee:
-            return Response(
-                {"detail": "Full payment amount cannot be less than the course fee."},
-                status=400,
-            )
+        if payment_type == Payment.PaymentType.FULL:
+            # Always charge the correct amount for full payment — ignore whatever
+            # the frontend sent and use the server-calculated (possibly discounted) fee.
+            amount = true_full_fee
 
         # For part payment, cap check still uses the (possibly discounted) full fee as the ceiling reference if you want — currently no upper bound enforced, matching your original behavior.
 
