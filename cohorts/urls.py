@@ -2,6 +2,7 @@ from django.urls import path
 from .views import (
     CohortListCreateView, CohortDetailView, CohortStatsView, DashboardStatsView,
     TutorClassSessionListCreateView, SessionRosterView, BulkAttendanceView,
+    StudentClassSessionsView,
 )
 
 urlpatterns = [
@@ -12,4 +13,5 @@ urlpatterns = [
     path('sessions/', TutorClassSessionListCreateView.as_view(), name='tutor-sessions'),
     path('sessions/<int:session_id>/roster/', SessionRosterView.as_view(), name='session-roster'),
     path('sessions/<int:session_id>/attendance/', BulkAttendanceView.as_view(), name='session-attendance'),
+    path('my-classes/', StudentClassSessionsView.as_view(), name='student-classes'),
 ]

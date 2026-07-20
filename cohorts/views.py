@@ -10,8 +10,8 @@ from results.models import Result
 from .models import ClassSession, Attendance
 from .serializers import ClassSessionSerializer, AttendanceSerializer, AttendanceStudentSerializer
 from tutors.permissions import IsTutor
-from django.shortcuts import get_object_or_404
-from tutors.permissions import IsTutor
+from django.utils import timezone
+from applications.models import Application
 
 
 class IsStaffOrReadOnly(permissions.BasePermission):
@@ -111,3 +111,41 @@ class BulkAttendanceView(APIView):
             )
             created.append(obj)
         return Response(AttendanceSerializer(created, many=True).data)
+    
+class StudentClassSessionsView(APIView):
+    """
+    Returns this student's classes for a specific course, split into
+    today / future / completed buckets.
+
+    GET /api/cohorts/my-classes/?course=<course_id>
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        course_id = request.query_params.get('course')
+        if not course_id:
+            return Response({'detail': 'course query param is required.'}, status=400)
+
+        application = Application.objects.filter(
+            student=request.user, course_id=course_id
+        ).select_related('cohort').first()
+
+        if not application or not application.cohort:
+            return Response({
+                'today': [],
+                'future': [],
+                'completed': [],
+            })
+
+        today = timezone.now().date()
+        sessions = ClassSession.objects.filter(cohort=application.cohort)
+
+        today_sessions = sessions.filter(date=today)
+        future_sessions = sessions.filter(date__gt=today)
+        completed_sessions = sessions.filter(date__lt=today)
+
+        return Response({
+            'today': ClassSessionSerializer(today_sessions, many=True).data,
+            'future': ClassSessionSerializer(future_sessions, many=True).data,
+            'completed': ClassSessionSerializer(completed_sessions, many=True).data,
+        })
