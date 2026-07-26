@@ -149,3 +149,65 @@ class StudentClassSessionsView(APIView):
             'future': ClassSessionSerializer(future_sessions, many=True).data,
             'completed': ClassSessionSerializer(completed_sessions, many=True).data,
         })
+
+class AdminCohortsTodayView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request):
+        today = timezone.now().date()
+        sessions_today = ClassSession.objects.filter(date=today).select_related('cohort', 'tutor')
+
+        data = []
+        for session in sessions_today:
+            attendance_taken = session.attendance_records.exists()
+            data.append({
+                'cohort_id': session.cohort_id,
+                'cohort_name': session.cohort.name,
+                'session_id': session.id,
+                'tutor': session.tutor.user.get_full_name() if session.tutor else None,
+                'start_time': session.start_time,
+                'end_time': session.end_time,
+                'attendance_taken': attendance_taken,
+            })
+
+        return Response(data)
+
+
+class AdminCohortAttendanceView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request, cohort_id):
+        session_id = request.query_params.get('session')
+
+        if session_id:
+            session = get_object_or_404(ClassSession, id=session_id, cohort_id=cohort_id)
+        else:
+            today = timezone.now().date()
+            session = ClassSession.objects.filter(
+                cohort_id=cohort_id, date=today
+            ).order_by('-start_time').first()
+
+            if not session:
+                return Response(
+                    {'detail': 'No class session today for this cohort.'},
+                    status=404
+                )
+
+        roster = session.roster
+        roster_data = AttendanceStudentSerializer(roster, many=True).data
+
+        attendance_map = {
+            a.application_id: a
+            for a in session.attendance_records.select_related('application__student')
+        }
+
+        for entry in roster_data:
+            att = attendance_map.get(entry['application_id'])
+            entry['status'] = att.status if att else None
+            entry['marked'] = att is not None
+
+        return Response({
+            'session': ClassSessionSerializer(session).data,
+            'attendance_taken': session.attendance_records.exists(),
+            'roster': roster_data,
+        })
