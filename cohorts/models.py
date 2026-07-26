@@ -9,10 +9,22 @@ class Cohort(models.Model):
         ('completed', 'Completed'),
     ]
 
-    name = models.CharField(max_length=150, unique=True)  # e.g. "January 2026 Set"
+    DAY_CHOICES = [
+        ('mon', 'Monday'),
+        ('tue', 'Tuesday'),
+        ('wed', 'Wednesday'),
+        ('thu', 'Thursday'),
+        ('fri', 'Friday'),
+        ('sat', 'Saturday'),
+        ('sun', 'Sunday'),
+    ]
+
+    name = models.CharField(max_length=150, unique=True)
     start_date = models.DateField()
     end_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='upcoming')
+    tutor = models.ForeignKey('tutors.Tutor', on_delete=models.SET_NULL, null=True, blank=True, related_name='cohorts')
+    class_days = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -23,18 +35,15 @@ class Cohort(models.Model):
 
     @property
     def student_count(self):
-        # Counts applications assigned to this cohort.
-        # Assumes Application model has a nullable FK to Cohort (added separately).
         return self.applications.count()
 
     @property
+    def is_learning_today(self):
+        today_code = timezone.now().strftime('%a').lower()
+        return today_code in self.class_days
+
+    @property
     def current_stage(self):
-        """
-        stage_1 = Morning Class (0–59 days in)
-        stage_2 = Afternoon Class (60–119 days in)
-        stage_3 = Projects Class (120–179 days in)
-        completed = 180+ days in
-        """
         days_in = (timezone.now().date() - self.start_date).days
         if days_in < 0:
             return 'not_started'
@@ -59,7 +68,6 @@ class Cohort(models.Model):
 
     @property
     def stage_countdown_days(self):
-        """Days remaining until next promotion (or completion once in stage_3)."""
         days_in = (timezone.now().date() - self.start_date).days
         if days_in < 0:
             return None
@@ -71,13 +79,12 @@ class Cohort(models.Model):
             return 180 - days_in
         return 0
 
+
 class ClassSession(models.Model):
     cohort = models.ForeignKey(Cohort, on_delete=models.CASCADE, related_name='class_sessions')
     tutor = models.ForeignKey('tutors.Tutor', on_delete=models.SET_NULL, null=True, related_name='class_sessions')
-    topics_covered = models.TextField(
-    blank=True,
-    help_text="Topics covered in this session — one per line, or comma-separated"
-)
+    topics_covered = models.TextField(blank=True)
+    project_note = models.TextField(blank=True)
     date = models.DateField()
     start_time = models.TimeField()
     end_time = models.TimeField()
@@ -98,7 +105,6 @@ class ClassSession(models.Model):
 
     @property
     def roster(self):
-        """Students expected at this session — pulled from the cohort's applications."""
         return self.cohort.applications.select_related('student').all()
 
 

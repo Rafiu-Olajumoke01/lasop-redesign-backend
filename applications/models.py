@@ -10,11 +10,19 @@ class Application(models.Model):
         ('physical', 'Physical'),
     ]
 
+    STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('inactive', 'Inactive'),
+        ('expelled', 'Expelled'),
+        ('withdrawn', 'Withdrawn'),
+    ]
+
     student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='applications')
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='applications')
     cohort = models.ForeignKey(Cohort, on_delete=models.SET_NULL, blank=True, null=True, related_name='applications')
     mode_of_learning = models.CharField(max_length=20, choices=MODE_CHOICES)
     location = models.ForeignKey(Location, on_delete=models.SET_NULL, blank=True, null=True, related_name='applications')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

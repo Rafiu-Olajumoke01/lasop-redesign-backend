@@ -1,5 +1,4 @@
 from rest_framework import serializers
-from .models import Cohort
 from .models import Cohort, ClassSession, Attendance
 
 
@@ -8,6 +7,8 @@ class CohortSerializer(serializers.ModelSerializer):
     current_stage = serializers.CharField(read_only=True)
     current_stage_label = serializers.CharField(read_only=True)
     stage_countdown_days = serializers.IntegerField(read_only=True)
+    is_learning_today = serializers.BooleanField(read_only=True)
+    tutor_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Cohort
@@ -17,13 +18,24 @@ class CohortSerializer(serializers.ModelSerializer):
             'start_date',
             'end_date',
             'status',
+            'tutor',
+            'tutor_name',
+            'class_days',
             'student_count',
             'current_stage',
             'current_stage_label',
             'stage_countdown_days',
+            'is_learning_today',
             'created_at',
         ]
         read_only_fields = ['id', 'created_at']
+
+    def get_tutor_name(self, obj):
+        if obj.tutor and obj.tutor.user:
+            full = f"{obj.tutor.user.first_name} {obj.tutor.user.last_name}".strip()
+            return full or obj.tutor.user.email
+        return None
+
 
 class ClassSessionSerializer(serializers.ModelSerializer):
     duration_hours = serializers.ReadOnlyField()
@@ -32,14 +44,13 @@ class ClassSessionSerializer(serializers.ModelSerializer):
     class Meta:
         model = ClassSession
         fields = [
-        'id', 'cohort', 'cohort_name', 'tutor', 'topics_covered',
-        'date', 'start_time', 'end_time', 'duration_hours', 'created_at',
+            'id', 'cohort', 'cohort_name', 'tutor', 'topics_covered', 'project_note',
+            'date', 'start_time', 'end_time', 'duration_hours', 'created_at',
         ]
         extra_kwargs = {'tutor': {'required': False}}
 
 
 class AttendanceStudentSerializer(serializers.Serializer):
-    """Small nested shape for the roster — one entry per enrolled student."""
     application_id = serializers.IntegerField(source='id')
     student_name = serializers.SerializerMethodField()
     student_email = serializers.CharField(source='student.email')
