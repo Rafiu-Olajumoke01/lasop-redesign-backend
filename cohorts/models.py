@@ -23,7 +23,7 @@ class Cohort(models.Model):
     start_date = models.DateField()
     end_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='upcoming')
-    tutor = models.ForeignKey('tutors.Tutor', on_delete=models.SET_NULL, null=True, blank=True, related_name='cohorts')
+    tutor = models.ForeignKey('tutors.Tutor', on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_cohorts')
     class_days = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
