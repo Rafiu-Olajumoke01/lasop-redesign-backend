@@ -268,3 +268,13 @@ class AdminCohortDetailView(APIView):
             },
             'today': today_data,
         })
+
+
+
+class AdminCohortSessionsView(generics.ListAPIView):
+    serializer_class = ClassSessionSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        cohort_id = self.kwargs['cohort_id']
+        return ClassSession.objects.filter(cohort_id=cohort_id).order_by('-date')

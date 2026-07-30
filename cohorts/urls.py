@@ -3,7 +3,7 @@ from .views import (
     CohortListCreateView, CohortDetailView, CohortStatsView, DashboardStatsView,
     TutorClassSessionListCreateView, SessionRosterView, BulkAttendanceView,
     StudentClassSessionsView, AdminCohortsTodayView, AdminCohortAttendanceView,
-    AdminCohortDetailView,
+    AdminCohortDetailView, AdminCohortSessionsView
 )
 
 urlpatterns = [
@@ -18,4 +18,5 @@ urlpatterns = [
     path('<int:cohort_id>/admin-detail/', AdminCohortDetailView.as_view(), name='admin-cohort-detail'),
     path('<int:pk>/', CohortDetailView.as_view(), name='cohort-detail'),
     path('', CohortListCreateView.as_view(), name='cohort-list-create'),
+    path('<int:cohort_id>/sessions/', AdminCohortSessionsView.as_view(), name='admin-cohort-sessions'),
 ]
