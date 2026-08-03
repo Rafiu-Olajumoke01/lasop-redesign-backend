@@ -89,6 +89,10 @@ class ClassSession(models.Model):
     start_time = models.TimeField()
     end_time = models.TimeField()
     created_at = models.DateTimeField(auto_now_add=True)
+    title = models.CharField(max_length=255, blank=True)
+    lesson_outcome = models.TextField(blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    ended_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-date', '-start_time']

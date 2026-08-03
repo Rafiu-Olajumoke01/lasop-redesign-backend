@@ -80,7 +80,7 @@ class TutorClassSessionListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         tutor = self.request.user.tutor_profile
-        serializer.save(tutor=tutor)
+        serializer.save(tutor=tutor, started_at=timezone.now())
 
 
 class SessionRosterView(APIView):
@@ -90,8 +90,18 @@ class SessionRosterView(APIView):
         session = get_object_or_404(ClassSession, id=session_id, tutor__user=request.user)
         roster = session.roster
         data = AttendanceStudentSerializer(roster, many=True).data
-        return Response(data)
 
+        attendance_map = {
+            a.application_id: a
+            for a in session.attendance_records.select_related('application__student')
+        }
+
+        for entry in data:
+            att = attendance_map.get(entry['application_id'])
+            entry['status'] = att.status if att else None
+            entry['marked'] = att is not None
+
+        return Response(data)
 
 class BulkAttendanceView(APIView):
     permission_classes = [IsTutor]
@@ -278,3 +288,14 @@ class AdminCohortSessionsView(generics.ListAPIView):
     def get_queryset(self):
         cohort_id = self.kwargs['cohort_id']
         return ClassSession.objects.filter(cohort_id=cohort_id).order_by('-date')
+
+class StopClassSessionView(APIView):
+    permission_classes = [IsTutor]
+
+    def post(self, request, session_id):
+        session = get_object_or_404(ClassSession, id=session_id, tutor__user=request.user)
+        if session.ended_at:
+            return Response({'detail': 'This session has already been stopped.'}, status=400)
+        session.ended_at = timezone.now()
+        session.save(update_fields=['ended_at'])
+        return Response(ClassSessionSerializer(session).data)

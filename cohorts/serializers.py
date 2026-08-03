@@ -40,15 +40,20 @@ class CohortSerializer(serializers.ModelSerializer):
 class ClassSessionSerializer(serializers.ModelSerializer):
     duration_hours = serializers.ReadOnlyField()
     cohort_name = serializers.CharField(source='cohort.name', read_only=True)
+    attendance_marked = serializers.SerializerMethodField()
 
     class Meta:
         model = ClassSession
         fields = [
-            'id', 'cohort', 'cohort_name', 'tutor', 'topics_covered', 'project_note',
-            'date', 'start_time', 'end_time', 'duration_hours', 'created_at',
+            'id', 'cohort', 'cohort_name', 'tutor', 'title', 'topics_covered',
+            'lesson_outcome', 'date', 'start_time', 'end_time', 'duration_hours',
+            'started_at', 'ended_at', 'attendance_marked', 'created_at',
         ]
         extra_kwargs = {'tutor': {'required': False}}
+        read_only_fields = ['started_at', 'ended_at']
 
+    def get_attendance_marked(self, obj):
+        return Attendance.objects.filter(session=obj).exists()
 
 class AttendanceStudentSerializer(serializers.Serializer):
     application_id = serializers.IntegerField(source='id')
