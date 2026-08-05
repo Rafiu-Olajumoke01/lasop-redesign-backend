@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from .models import Application
 from .serializers import ApplicationSerializer
+from users.serializers import UserSerializer
 
 
 class ApplicationListCreateView(APIView):
@@ -66,3 +67,67 @@ class ApplicationDetailView(APIView):
             return Response({'error': 'Application not found'}, status=status.HTTP_404_NOT_FOUND)
         application.delete()
         return Response({'message': 'Course removed successfully'}, status=status.HTTP_204_NO_CONTENT)
+
+
+class GroupedApplicantsView(APIView):
+    """
+    Staff-only. Groups Application rows by student so Backstage can render
+    one card per applicant with all of their course entries inside it.
+
+    Bucket rule: a student is "an applicant" as long as at least one of
+    their Application rows has cohort=None (unassigned). The moment every
+    course they've applied for has a cohort, they no longer appear here —
+    they're a student. If they later apply for a new course, a fresh
+    Application row with cohort=None brings them back into this list.
+
+    Within an applicant's course list: already-assigned courses (cohort
+    set) come first since they need no review, newly added / unassigned
+    ones come last.
+
+    Applicant ordering: oldest applicant first (first-come-first-served).
+    "Oldest" is anchored to the EARLIEST created_at across all of a
+    student's Application rows — so a returning student (who added a new
+    course after already being converted once) keeps their original queue
+    position rather than jumping to the back of the line. Flagging this as
+    an assumption in case you'd rather anchor on the newest row instead.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not request.user.is_staff:
+            return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
+
+        applications = Application.objects.select_related(
+            'student', 'course', 'cohort', 'cohort__tutor', 'location'
+        )
+
+        groups = {}
+        for app in applications:
+            groups.setdefault(app.student_id, []).append(app)
+
+        applicant_groups = []
+        for apps in groups.values():
+            still_applicant = any(a.cohort_id is None for a in apps)
+            if not still_applicant:
+                continue
+
+            completed = sorted((a for a in apps if a.cohort_id is not None), key=lambda a: a.created_at)
+            pending = sorted((a for a in apps if a.cohort_id is None), key=lambda a: a.created_at)
+
+            applicant_groups.append({
+                'student': apps[0].student,
+                'anchor': min(a.created_at for a in apps),
+                'courses': completed + pending,
+            })
+
+        applicant_groups.sort(key=lambda g: g['anchor'])
+
+        data = [
+            {
+                'student': UserSerializer(g['student']).data,
+                'courses': ApplicationSerializer(g['courses'], many=True).data,
+            }
+            for g in applicant_groups
+        ]
+
+        return Response(data, status=status.HTTP_200_OK)
