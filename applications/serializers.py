@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import Application
 from courses.models import Course, Location
 from cohorts.serializers import CohortSerializer
+from tutors.serializers import TutorSerializer
 from users.serializers import UserSerializer
 
 
@@ -22,6 +23,7 @@ class ApplicationSerializer(serializers.ModelSerializer):
     course_detail = CourseSerializer(source='course', read_only=True)
     location_detail = LocationSerializer(source='location', read_only=True)
     cohort_detail = CohortSerializer(source='cohort', read_only=True)
+    tutor_detail = TutorSerializer(source='tutor', read_only=True)
     payment_status = serializers.SerializerMethodField()
     amount_paid = serializers.SerializerMethodField()
     payment = serializers.SerializerMethodField()
@@ -30,8 +32,8 @@ class ApplicationSerializer(serializers.ModelSerializer):
         model = Application
         fields = [
             'id', 'student', 'student_detail', 'course', 'course_detail', 'mode_of_learning',
-            'location', 'location_detail', 'cohort', 'cohort_detail', 'created_at',
-            'payment_status', 'amount_paid', 'payment',
+            'location', 'location_detail', 'cohort', 'cohort_detail', 'tutor', 'tutor_detail',
+            'created_at', 'payment_status', 'amount_paid', 'payment',
         ]
         read_only_fields = ['student', 'created_at']
 
