@@ -301,8 +301,6 @@ class StopClassSessionView(APIView):
         return Response(ClassSessionSerializer(session).data)
 
 
-# cohorts/views.py — add this view at the bottom (imports already present: Application, Attendance, timezone)
-
 class ApplicationAnalyticsView(APIView):
     """Admin-only: attendance + timeline analytics for a single Application (course)."""
     permission_classes = [permissions.IsAdminUser]
@@ -348,6 +346,7 @@ class ApplicationAnalyticsView(APIView):
                 'end_date': cohort.end_date if cohort else None,
                 'status': cohort.status if cohort else None,
             } if cohort else None,
+            'tutor_id': application.tutor_id,
             'tutor_name': (
                 application.tutor.user.get_full_name() or application.tutor.user.email
             ) if application.tutor and application.tutor.user else None,
