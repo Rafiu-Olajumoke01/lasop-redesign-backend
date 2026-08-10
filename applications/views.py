@@ -1,10 +1,12 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from django.shortcuts import get_object_or_404
 from .models import Application
 from .serializers import ApplicationSerializer
 from users.serializers import UserSerializer
+from users.models import User
 
 
 class ApplicationListCreateView(APIView):
@@ -129,5 +131,38 @@ class GroupedApplicantsView(APIView):
             }
             for g in applicant_groups
         ]
+
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class StudentApplicationsView(APIView):
+    """Admin-only: list all courses (Applications) a given student is enrolled in.
+    Used on the student detail page in Backstage to render the 'Courses' rows."""
+    permission_classes = [IsAdminUser]
+
+    def get(self, request, user_id):
+        student = get_object_or_404(User, id=user_id, is_tutor=False, is_staff=False)
+
+        applications = Application.objects.filter(student=student).select_related(
+            'course', 'cohort', 'tutor__user'
+        )
+
+        data = []
+        for app in applications:
+            tutor_name = None
+            if app.tutor and app.tutor.user:
+                tutor_name = app.tutor.user.get_full_name() or app.tutor.user.email
+
+            data.append({
+                'application_id': app.id,
+                'course_id': app.course_id,
+                'course_name': app.course.title if app.course else None,
+                'cohort_id': app.cohort_id,
+                'cohort_name': app.cohort.name if app.cohort else None,
+                'tutor_id': app.tutor_id,
+                'tutor_name': tutor_name,
+                'status': app.status,
+                'mode_of_learning': app.mode_of_learning,
+            })
 
         return Response(data, status=status.HTTP_200_OK)
