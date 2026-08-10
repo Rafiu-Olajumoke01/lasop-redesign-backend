@@ -299,3 +299,69 @@ class StopClassSessionView(APIView):
         session.ended_at = timezone.now()
         session.save(update_fields=['ended_at'])
         return Response(ClassSessionSerializer(session).data)
+
+
+# cohorts/views.py — add this view at the bottom (imports already present: Application, Attendance, timezone)
+
+class ApplicationAnalyticsView(APIView):
+    """Admin-only: attendance + timeline analytics for a single Application (course)."""
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request, application_id):
+        application = get_object_or_404(
+            Application.objects.select_related('cohort', 'course', 'tutor__user', 'student'),
+            id=application_id
+        )
+
+        cohort = application.cohort
+
+        attendance_qs = Attendance.objects.filter(application=application)
+        present = attendance_qs.filter(status='present').count()
+        absent = attendance_qs.filter(status='absent').count()
+        late = attendance_qs.filter(status='late').count()
+        total_marked = present + absent + late
+
+        attendance_rate = round((present / total_marked) * 100, 1) if total_marked else None
+
+        today = timezone.now().date()
+        days_since_start = None
+        days_remaining = None
+        current_stage_label = None
+
+        if cohort and cohort.start_date:
+            days_since_start = (today - cohort.start_date).days
+            current_stage_label = cohort.current_stage_label
+
+        if cohort and cohort.end_date:
+            days_remaining = (cohort.end_date - today).days
+
+        total_sessions_held = ClassSession.objects.filter(cohort=cohort).count() if cohort else 0
+
+        return Response({
+            'application_id': application.id,
+            'student_id': application.student_id,
+            'course_title': application.course.title if application.course else None,
+            'cohort': {
+                'id': cohort.id if cohort else None,
+                'name': cohort.name if cohort else None,
+                'start_date': cohort.start_date if cohort else None,
+                'end_date': cohort.end_date if cohort else None,
+                'status': cohort.status if cohort else None,
+            } if cohort else None,
+            'tutor_name': (
+                application.tutor.user.get_full_name() or application.tutor.user.email
+            ) if application.tutor and application.tutor.user else None,
+            'attendance': {
+                'present': present,
+                'absent': absent,
+                'late': late,
+                'total_marked': total_marked,
+                'total_sessions_held': total_sessions_held,
+                'attendance_rate': attendance_rate,
+            },
+            'timeline': {
+                'days_since_start': days_since_start,
+                'days_remaining': days_remaining,
+                'current_stage_label': current_stage_label,
+            },
+        })
