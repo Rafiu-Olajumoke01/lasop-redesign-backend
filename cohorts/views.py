@@ -335,9 +335,14 @@ class ApplicationAnalyticsView(APIView):
 
         total_sessions_held = ClassSession.objects.filter(cohort=cohort).count() if cohort else 0
 
+        student_name = None
+        if application.student:
+            student_name = application.student.get_full_name() or application.student.email
+
         return Response({
             'application_id': application.id,
             'student_id': application.student_id,
+            'student_name': student_name,
             'course_title': application.course.title if application.course else None,
             'cohort': {
                 'id': cohort.id if cohort else None,
