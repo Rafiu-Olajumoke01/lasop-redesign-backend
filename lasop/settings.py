@@ -149,3 +149,9 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'mail.lasop.net')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 465))
+EMAIL_USE_SSL = True
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'no-reply@lasop.net')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = 'no-reply@lasop.net'
