@@ -156,3 +156,4 @@ EMAIL_USE_SSL = True
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'no-reply@lasop.net')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = 'no-reply@lasop.net'
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://lasop.net')
