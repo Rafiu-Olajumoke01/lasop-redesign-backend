@@ -125,3 +125,26 @@ class Attendance(models.Model):
 
     def __str__(self):
         return f"{self.application.student} — {self.session.date} — {self.status}"
+
+
+class CapstoneProject(models.Model):
+    STAGE_CHOICES = [
+        ('stage_1', 'Month 1'),
+        ('stage_2', 'Month 2'),
+        ('stage_3', 'Month 3'),
+    ]
+
+    cohort = models.ForeignKey(Cohort, on_delete=models.CASCADE, related_name='capstone_projects')
+    tutor = models.ForeignKey('tutors.Tutor', on_delete=models.SET_NULL, null=True, related_name='capstone_projects')
+    stage = models.CharField(max_length=20, choices=STAGE_CHOICES)
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    attachment = models.FileField(upload_to='capstone_projects/', blank=True, null=True)
+    due_date = models.DateField(null=True, blank=True)
+    posted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-posted_at']
+
+    def __str__(self):
+        return f"{self.cohort.name} — {self.get_stage_display()} — {self.title}"
