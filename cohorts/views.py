@@ -8,8 +8,13 @@ from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from exams.models import Exam
 from results.models import Result
-from .models import ClassSession, Attendance
-from .serializers import ClassSessionSerializer, AttendanceSerializer, AttendanceStudentSerializer
+from .models import ClassSession, Attendance, CapstoneProject
+from .serializers import (
+    ClassSessionSerializer,
+    AttendanceSerializer,
+    AttendanceStudentSerializer,
+    CapstoneProjectSerializer,
+)
 from tutors.permissions import IsTutor
 from django.utils import timezone
 from applications.models import Application
@@ -369,3 +374,34 @@ class ApplicationAnalyticsView(APIView):
                 'current_stage_label': current_stage_label,
             },
         })
+
+
+class TutorCapstoneProjectListCreateView(generics.ListCreateAPIView):
+    serializer_class = CapstoneProjectSerializer
+    permission_classes = [IsTutor]
+
+    def get_queryset(self):
+        return CapstoneProject.objects.filter(tutor__user=self.request.user)
+
+    def perform_create(self, serializer):
+        tutor = self.request.user.tutor_profile
+        serializer.save(tutor=tutor)
+
+
+class StudentCapstoneProjectsView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        course_id = request.query_params.get('course')
+        if not course_id:
+            return Response({'detail': 'course query param is required.'}, status=400)
+
+        application = Application.objects.filter(
+            student=request.user, course_id=course_id
+        ).select_related('cohort').first()
+
+        if not application or not application.cohort:
+            return Response([])
+
+        projects = CapstoneProject.objects.filter(cohort=application.cohort)
+        return Response(CapstoneProjectSerializer(projects, many=True).data)

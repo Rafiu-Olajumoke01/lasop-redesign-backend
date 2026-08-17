@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Cohort, ClassSession, Attendance
+from .models import Cohort, ClassSession, Attendance, CapstoneProject
 
 
 class CohortSerializer(serializers.ModelSerializer):
@@ -76,3 +76,25 @@ class AttendanceSerializer(serializers.ModelSerializer):
         s = obj.application.student
         full = f"{s.first_name} {s.last_name}".strip()
         return full or s.email
+
+
+class CapstoneProjectSerializer(serializers.ModelSerializer):
+    cohort_name = serializers.CharField(source='cohort.name', read_only=True)
+    tutor_name = serializers.SerializerMethodField()
+    stage_label = serializers.CharField(source='get_stage_display', read_only=True)
+
+    class Meta:
+        model = CapstoneProject
+        fields = [
+            'id', 'cohort', 'cohort_name', 'tutor', 'tutor_name',
+            'stage', 'stage_label', 'title', 'description',
+            'attachment', 'due_date', 'posted_at',
+        ]
+        extra_kwargs = {'tutor': {'required': False}}
+        read_only_fields = ['posted_at']
+
+    def get_tutor_name(self, obj):
+        if obj.tutor and obj.tutor.user:
+            full = f"{obj.tutor.user.first_name} {obj.tutor.user.last_name}".strip()
+            return full or obj.tutor.user.email
+        return None
