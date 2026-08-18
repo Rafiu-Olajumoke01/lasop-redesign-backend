@@ -4,7 +4,9 @@ from .views import (
     TutorClassSessionListCreateView, SessionRosterView, BulkAttendanceView,
     StudentClassSessionsView, AdminCohortsTodayView, AdminCohortAttendanceView,
     AdminCohortDetailView, AdminCohortSessionsView, StopClassSessionView, ApplicationAnalyticsView,
-    TutorCapstoneProjectListCreateView, StudentCapstoneProjectsView
+    TutorCapstoneProjectListCreateView, StudentCapstoneProjectsView,
+    TutorAssessmentListCreateView, AdminAssessmentListCreateView, StudentAssessmentsView,
+    AssessmentRespondView, AdminOrTutorStudentAssessmentsView,
 )
 
 urlpatterns = [
@@ -24,4 +26,10 @@ urlpatterns = [
     path('applications/<int:application_id>/analytics/', ApplicationAnalyticsView.as_view(), name='application-analytics'),
     path('capstone-projects/', TutorCapstoneProjectListCreateView.as_view(), name='tutor-capstone-projects'),
     path('my-capstone-projects/', StudentCapstoneProjectsView.as_view(), name='student-capstone-projects'),
+
+    path('assessments/tutor/', TutorAssessmentListCreateView.as_view(), name='tutor-assessments'),
+    path('assessments/admin/', AdminAssessmentListCreateView.as_view(), name='admin-assessments'),
+    path('assessments/mine/', StudentAssessmentsView.as_view(), name='student-assessments'),
+    path('assessments/<int:assessment_id>/respond/', AssessmentRespondView.as_view(), name='assessment-respond'),
+    path('assessments/student/<int:student_id>/', AdminOrTutorStudentAssessmentsView.as_view(), name='student-assessments-detail'),
 ]

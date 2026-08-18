@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Cohort, ClassSession, Attendance, CapstoneProject
+from .models import Cohort, ClassSession, Attendance, CapstoneProject, Assessment
 
 
 class CohortSerializer(serializers.ModelSerializer):
@@ -98,3 +98,24 @@ class CapstoneProjectSerializer(serializers.ModelSerializer):
             full = f"{obj.tutor.user.first_name} {obj.tutor.user.last_name}".strip()
             return full or obj.tutor.user.email
         return None
+
+class AssessmentSerializer(serializers.ModelSerializer):
+    author_name = serializers.SerializerMethodField()
+    student_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Assessment
+        fields = [
+            'id', 'student', 'student_name', 'author', 'author_name',
+            'content', 'created_at', 'updated_at',
+            'student_response', 'responded_at',
+        ]
+        read_only_fields = ['id', 'author', 'created_at', 'updated_at', 'responded_at']
+
+    def get_author_name(self, obj):
+        full = f"{obj.author.first_name} {obj.author.last_name}".strip()
+        return full or obj.author.email
+
+    def get_student_name(self, obj):
+        full = f"{obj.student.first_name} {obj.student.last_name}".strip()
+        return full or obj.student.email

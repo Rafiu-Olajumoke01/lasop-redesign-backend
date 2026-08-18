@@ -1,19 +1,19 @@
 from django.shortcuts import get_object_or_404
 from django.db.models import Count
 from rest_framework import generics, permissions
-from .models import Cohort
 from .serializers import CohortSerializer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from exams.models import Exam
 from results.models import Result
-from .models import ClassSession, Attendance, CapstoneProject
+from .models import Cohort, ClassSession, Attendance, CapstoneProject, Assessment
 from .serializers import (
     ClassSessionSerializer,
     AttendanceSerializer,
     AttendanceStudentSerializer,
     CapstoneProjectSerializer,
+    AssessmentSerializer,
 )
 from tutors.permissions import IsTutor
 from django.utils import timezone
@@ -405,3 +405,73 @@ class StudentCapstoneProjectsView(APIView):
 
         projects = CapstoneProject.objects.filter(cohort=application.cohort)
         return Response(CapstoneProjectSerializer(projects, many=True).data)
+
+class TutorAssessmentListCreateView(generics.ListCreateAPIView):
+    """Tutor: list assessments they've posted, and post a new one."""
+    serializer_class = AssessmentSerializer
+    permission_classes = [IsTutor]
+
+    def get_queryset(self):
+        return Assessment.objects.filter(author=self.request.user)
+
+    def perform_create(self, serializer):
+        tutor_profile = self.request.user.tutor_profile
+        student = serializer.validated_data.get('student')
+
+        if student.assigned_tutor_id != tutor_profile.id:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You can only assess your assigned students.")
+
+        serializer.save(author=self.request.user)
+
+
+class AdminAssessmentListCreateView(generics.ListCreateAPIView):
+    """Admin: list all assessments, and post a new one for any student."""
+    serializer_class = AssessmentSerializer
+    permission_classes = [permissions.IsAdminUser]
+    queryset = Assessment.objects.all()
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
+
+
+class StudentAssessmentsView(APIView):
+    """Student: view all assessments posted to them (for their dashboard)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        assessments = Assessment.objects.filter(student=request.user)
+        return Response(AssessmentSerializer(assessments, many=True).data)
+
+
+class AssessmentRespondView(APIView):
+    """Student: add or edit their (optional) response to an assessment. Not locked — editable anytime."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, assessment_id):
+        assessment = get_object_or_404(Assessment, id=assessment_id, student=request.user)
+
+        assessment.student_response = request.data.get('student_response', '')
+        assessment.responded_at = timezone.now()
+        assessment.save(update_fields=['student_response', 'responded_at'])
+
+        return Response(AssessmentSerializer(assessment).data)
+
+
+class AdminOrTutorStudentAssessmentsView(APIView):
+    """Admin/Tutor: view all assessments for one specific student (e.g. on the student detail page)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, student_id):
+        user = request.user
+        if not (user.is_staff or user.is_superuser or user.is_tutor):
+            return Response({'detail': 'Not allowed.'}, status=403)
+
+        assessments = Assessment.objects.filter(student_id=student_id)
+
+        # tutor can only view assessments for their own assigned students
+        if user.is_tutor and not (user.is_staff or user.is_superuser):
+            tutor_profile = user.tutor_profile
+            assessments = assessments.filter(student__assigned_tutor_id=tutor_profile.id)
+
+        return Response(AssessmentSerializer(assessments, many=True).data)
