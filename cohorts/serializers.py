@@ -55,8 +55,10 @@ class ClassSessionSerializer(serializers.ModelSerializer):
     def get_attendance_marked(self, obj):
         return Attendance.objects.filter(session=obj).exists()
 
+
 class AttendanceStudentSerializer(serializers.Serializer):
     application_id = serializers.IntegerField(source='id')
+    student_id = serializers.IntegerField(source='student.id')
     student_name = serializers.SerializerMethodField()
     student_email = serializers.CharField(source='student.email')
 
@@ -98,6 +100,7 @@ class CapstoneProjectSerializer(serializers.ModelSerializer):
             full = f"{obj.tutor.user.first_name} {obj.tutor.user.last_name}".strip()
             return full or obj.tutor.user.email
         return None
+
 
 class AssessmentSerializer(serializers.ModelSerializer):
     author_name = serializers.SerializerMethodField()
