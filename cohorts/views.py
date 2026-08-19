@@ -1,5 +1,5 @@
 from django.shortcuts import get_object_or_404
-from django.db.models import Count
+from django.db.models import Count, Q
 from rest_framework import generics, permissions
 from .serializers import CohortSerializer
 from rest_framework.response import Response
@@ -18,6 +18,12 @@ from .serializers import (
 from tutors.permissions import IsTutor
 from django.utils import timezone
 from applications.models import Application
+
+
+def is_tutor_assigned_to_student(tutor_profile, student):
+    return Application.objects.filter(student=student).filter(
+        Q(tutor=tutor_profile) | Q(cohort__tutor=tutor_profile)
+    ).exists()
 
 
 class IsStaffOrReadOnly(permissions.BasePermission):
@@ -418,7 +424,7 @@ class TutorAssessmentListCreateView(generics.ListCreateAPIView):
         tutor_profile = self.request.user.tutor_profile
         student = serializer.validated_data.get('student')
 
-        if student.assigned_tutor_id != tutor_profile.id:
+        if not is_tutor_assigned_to_student(tutor_profile, student):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied("You can only assess your assigned students.")
 
@@ -472,6 +478,10 @@ class AdminOrTutorStudentAssessmentsView(APIView):
         # tutor can only view assessments for their own assigned students
         if user.is_tutor and not (user.is_staff or user.is_superuser):
             tutor_profile = user.tutor_profile
-            assessments = assessments.filter(student__assigned_tutor_id=tutor_profile.id)
+            assessments = assessments.filter(
+                student__applications__cohort__tutor=tutor_profile
+            ).distinct() | assessments.filter(
+                student__applications__tutor=tutor_profile
+            ).distinct()
 
         return Response(AssessmentSerializer(assessments, many=True).data)
