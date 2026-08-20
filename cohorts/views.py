@@ -5,6 +5,7 @@ from .serializers import CohortSerializer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
+from .serializers import PublicStudentProjectSerializer
 from exams.models import Exam
 from results.models import Result
 from .models import Cohort, ClassSession, Attendance, CapstoneProject, Assessment
@@ -614,9 +615,11 @@ class AdminStudentProjectFeatureToggleView(APIView):
         project.save(update_fields=['is_featured'])
         return Response(StudentProjectSerializer(project).data)
 
-
-class FeaturedStudentProjectsView(generics.ListAPIView):
-    """Public: powers the homepage showcase — no more manual posting."""
-    serializer_class = StudentProjectSerializer
+class PublicFeaturedStudentProjectsView(generics.ListAPIView):
+    serializer_class = PublicStudentProjectSerializer
     permission_classes = [AllowAny]
-    queryset = StudentProject.objects.filter(is_featured=True, status='submitted')
+
+    def get_queryset(self):
+        return StudentProject.objects.filter(
+            is_featured=True, status='submitted'
+        ).order_by('-created_at')

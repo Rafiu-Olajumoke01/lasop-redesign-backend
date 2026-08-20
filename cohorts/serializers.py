@@ -140,3 +140,21 @@ class AssessmentSerializer(serializers.ModelSerializer):
     def get_student_name(self, obj):
         full = f"{obj.student.first_name} {obj.student.last_name}".strip()
         return full or obj.student.email
+
+class PublicStudentProjectSerializer(serializers.ModelSerializer):
+    student_name = serializers.SerializerMethodField()
+    tech_stack_list = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StudentProject
+        fields = [
+            'id', 'title', 'description', 'tech_stack_list',
+            'repo_url', 'live_url', 'student_name', 'created_at',
+        ]
+
+    def get_student_name(self, obj):
+        s = obj.student
+        return f"{s.first_name} {s.last_name}".strip() or s.email
+
+    def get_tech_stack_list(self, obj):
+        return [t.strip() for t in (obj.tech_stack or '').split(',') if t.strip()]
