@@ -6,7 +6,7 @@ from .views import (
     AdminCohortDetailView, AdminCohortSessionsView, StopClassSessionView, ApplicationAnalyticsView,
     TutorCapstoneProjectListCreateView, StudentCapstoneProjectsView,
     TutorAssessmentListCreateView, AdminAssessmentListCreateView, StudentAssessmentsView,
-    AssessmentRespondView, AdminOrTutorStudentAssessmentsView,
+    AssessmentRespondView, AdminOrTutorStudentAssessmentsView, TutorStudentsListView
 )
 
 urlpatterns = [
@@ -32,4 +32,5 @@ urlpatterns = [
     path('assessments/mine/', StudentAssessmentsView.as_view(), name='student-assessments'),
     path('assessments/<int:assessment_id>/respond/', AssessmentRespondView.as_view(), name='assessment-respond'),
     path('assessments/student/<int:student_id>/', AdminOrTutorStudentAssessmentsView.as_view(), name='student-assessments-detail'),
+    path('tutor/students/', TutorStudentsListView.as_view(), name='tutor-students-list'),
 ]

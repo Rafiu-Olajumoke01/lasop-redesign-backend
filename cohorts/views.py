@@ -21,8 +21,16 @@ from applications.models import Application
 
 
 def is_tutor_assigned_to_student(tutor_profile, student):
+    """
+    A tutor is assigned to a student if the student's Application's cohort
+    is one of the tutor's cohorts (Tutor.cohorts M2M) — this is the real
+    source of truth. Application.tutor / Cohort.tutor are kept as extra
+    checks in case they're set elsewhere, but they are not reliable alone.
+    """
     return Application.objects.filter(student=student).filter(
-        Q(tutor=tutor_profile) | Q(cohort__tutor=tutor_profile)
+        Q(tutor=tutor_profile) |
+        Q(cohort__tutor=tutor_profile) |
+        Q(cohort__in=tutor_profile.cohorts.all())
     ).exists()
 
 
@@ -475,13 +483,36 @@ class AdminOrTutorStudentAssessmentsView(APIView):
 
         assessments = Assessment.objects.filter(student_id=student_id)
 
-        # tutor can only view assessments for their own assigned students
+        # tutor can only view assessments for students on their own assigned cohorts
         if user.is_tutor and not (user.is_staff or user.is_superuser):
             tutor_profile = user.tutor_profile
             assessments = assessments.filter(
-                student__applications__cohort__tutor=tutor_profile
-            ).distinct() | assessments.filter(
-                student__applications__tutor=tutor_profile
+                Q(student__applications__cohort__tutor=tutor_profile) |
+                Q(student__applications__tutor=tutor_profile) |
+                Q(student__applications__cohort__in=tutor_profile.cohorts.all())
             ).distinct()
 
         return Response(AssessmentSerializer(assessments, many=True).data)
+
+
+class TutorStudentsListView(APIView):
+    """
+    Tutor: list every student across the tutor's own cohorts (Tutor.cohorts M2M).
+    This is the 'Students' tab — independent of roster/attendance/class sessions.
+    From here the tutor can act on a student directly (e.g. send an assessment)
+    without needing to have taken attendance for them first.
+    """
+    permission_classes = [IsTutor]
+
+    def get(self, request):
+        tutor_profile = request.user.tutor_profile
+        applications = Application.objects.filter(
+            cohort__in=tutor_profile.cohorts.all()
+        ).select_related('student', 'cohort')
+
+        data = AttendanceStudentSerializer(applications, many=True).data
+        for entry, app in zip(data, applications):
+            entry['cohort_id'] = app.cohort_id
+            entry['cohort_name'] = app.cohort.name if app.cohort else None
+
+        return Response(data)

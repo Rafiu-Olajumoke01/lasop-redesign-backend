@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Cohort, ClassSession, Attendance, CapstoneProject, Assessment
+from .models import Cohort, ClassSession, Attendance, StudentProject, CapstoneProject, Assessment
+
 
 
 class CohortSerializer(serializers.ModelSerializer):
@@ -79,7 +80,6 @@ class AttendanceSerializer(serializers.ModelSerializer):
         full = f"{s.first_name} {s.last_name}".strip()
         return full or s.email
 
-
 class CapstoneProjectSerializer(serializers.ModelSerializer):
     cohort_name = serializers.CharField(source='cohort.name', read_only=True)
     tutor_name = serializers.SerializerMethodField()
@@ -100,6 +100,24 @@ class CapstoneProjectSerializer(serializers.ModelSerializer):
             full = f"{obj.tutor.user.first_name} {obj.tutor.user.last_name}".strip()
             return full or obj.tutor.user.email
         return None
+
+class StudentProjectSerializer(serializers.ModelSerializer):
+    student_name = serializers.SerializerMethodField()
+    cohort_name = serializers.CharField(source='cohort.name', read_only=True)
+
+    class Meta:
+        model = StudentProject
+        fields = [
+            'id', 'student', 'student_name', 'cohort', 'cohort_name',
+            'title', 'description', 'tech_stack', 'repo_url', 'live_url',
+            'cover_image', 'attachment', 'status', 'tutor_feedback',
+            'is_featured', 'submitted_at', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'student', 'status', 'tutor_feedback', 'is_featured', 'submitted_at', 'created_at', 'updated_at']
+
+    def get_student_name(self, obj):
+        full = f"{obj.student.first_name} {obj.student.last_name}".strip()
+        return full or obj.student.email
 
 
 class AssessmentSerializer(serializers.ModelSerializer):

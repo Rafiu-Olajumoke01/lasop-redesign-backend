@@ -126,7 +126,6 @@ class Attendance(models.Model):
     def __str__(self):
         return f"{self.application.student} — {self.session.date} — {self.status}"
 
-
 class CapstoneProject(models.Model):
     STAGE_CHOICES = [
         ('stage_1', 'Month 1'),
@@ -148,6 +147,39 @@ class CapstoneProject(models.Model):
 
     def __str__(self):
         return f"{self.cohort.name} — {self.get_stage_display()} — {self.title}"
+
+    
+class StudentProject(models.Model):
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('submitted', 'Submitted'),
+        ('reviewed', 'Reviewed'),
+    ]
+
+    student = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='projects')
+    cohort = models.ForeignKey(Cohort, on_delete=models.SET_NULL, null=True, blank=True, related_name='student_projects')
+
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    tech_stack = models.CharField(max_length=255, blank=True)
+    repo_url = models.URLField(blank=True)
+    live_url = models.URLField(blank=True)
+    cover_image = models.ImageField(upload_to='student_projects/covers/', blank=True, null=True)
+    attachment = models.FileField(upload_to='student_projects/files/', blank=True, null=True)
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    tutor_feedback = models.TextField(blank=True)
+    is_featured = models.BooleanField(default=False)
+
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.student} — {self.title}"
 
 class Assessment(models.Model):
     student = models.ForeignKey(
