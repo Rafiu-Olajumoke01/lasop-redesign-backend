@@ -542,12 +542,12 @@ class StudentProjectDetailView(generics.RetrieveUpdateDestroyAPIView):
         return StudentProject.objects.filter(student=self.request.user)
 
     def perform_update(self, serializer):
-        if serializer.instance.status == 'reviewed':
+        if serializer.instance.status == 'submitted':
             raise PermissionDenied("This project has already been reviewed and can no longer be edited.")
         serializer.save()
 
     def perform_destroy(self, instance):
-        if instance.status == 'reviewed':
+        if instance.status == 'submitted':
             raise PermissionDenied("This project has already been reviewed and can no longer be deleted.")
         instance.delete()
 
@@ -592,7 +592,7 @@ class TutorStudentProjectFeedbackView(APIView):
             raise PermissionDenied("You can only give feedback to your assigned students.")
 
         project.tutor_feedback = request.data.get('tutor_feedback', project.tutor_feedback)
-        project.status = 'reviewed'
+        project.status = 'submitted'
         project.save(update_fields=['tutor_feedback', 'status'])
         return Response(StudentProjectSerializer(project).data)
 
@@ -619,4 +619,4 @@ class FeaturedStudentProjectsView(generics.ListAPIView):
     """Public: powers the homepage showcase — no more manual posting."""
     serializer_class = StudentProjectSerializer
     permission_classes = [AllowAny]
-    queryset = StudentProject.objects.filter(is_featured=True, status='reviewed')
+    queryset = StudentProject.objects.filter(is_featured=True, status='submitted')

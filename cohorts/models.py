@@ -153,7 +153,6 @@ class StudentProject(models.Model):
     STATUS_CHOICES = [
         ('draft', 'Draft'),
         ('submitted', 'Submitted'),
-        ('reviewed', 'Reviewed'),
     ]
 
     student = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='projects')
