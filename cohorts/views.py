@@ -18,6 +18,9 @@ from .serializers import (
 from tutors.permissions import IsTutor
 from django.utils import timezone
 from applications.models import Application
+from rest_framework.exceptions import PermissionDenied
+from .models import StudentProject
+from .serializers import StudentProjectSerializer
 
 
 def is_tutor_assigned_to_student(tutor_profile, student):
@@ -516,3 +519,104 @@ class TutorStudentsListView(APIView):
             entry['cohort_name'] = app.cohort.name if app.cohort else None
 
         return Response(data)
+
+
+class StudentProjectListCreateView(generics.ListCreateAPIView):
+    """Student: list their own projects, and post a new one."""
+    serializer_class = StudentProjectSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return StudentProject.objects.filter(student=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(student=self.request.user)
+
+
+class StudentProjectDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Student: view/edit/delete their own project. Locked once reviewed."""
+    serializer_class = StudentProjectSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return StudentProject.objects.filter(student=self.request.user)
+
+    def perform_update(self, serializer):
+        if serializer.instance.status == 'reviewed':
+            raise PermissionDenied("This project has already been reviewed and can no longer be edited.")
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        if instance.status == 'reviewed':
+            raise PermissionDenied("This project has already been reviewed and can no longer be deleted.")
+        instance.delete()
+
+
+class StudentProjectSubmitView(APIView):
+    """Student: move a project from draft -> submitted."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, project_id):
+        project = get_object_or_404(StudentProject, id=project_id, student=request.user)
+        if project.status != 'draft':
+            return Response({'detail': 'This project has already been submitted.'}, status=400)
+        project.status = 'submitted'
+        project.submitted_at = timezone.now()
+        project.save(update_fields=['status', 'submitted_at'])
+        return Response(StudentProjectSerializer(project).data)
+
+
+class TutorStudentProjectsListView(generics.ListAPIView):
+    """Tutor: view projects from students on their assigned cohorts."""
+    serializer_class = StudentProjectSerializer
+    permission_classes = [IsTutor]
+
+    def get_queryset(self):
+        tutor_profile = self.request.user.tutor_profile
+        return StudentProject.objects.filter(
+            Q(student__applications__cohort__tutor=tutor_profile) |
+            Q(student__applications__tutor=tutor_profile) |
+            Q(student__applications__cohort__in=tutor_profile.cohorts.all())
+        ).distinct()
+
+
+class TutorStudentProjectFeedbackView(APIView):
+    """Tutor: leave feedback on a submitted project, marks it reviewed."""
+    permission_classes = [IsTutor]
+
+    def patch(self, request, project_id):
+        project = get_object_or_404(StudentProject, id=project_id)
+        tutor_profile = request.user.tutor_profile
+
+        if not is_tutor_assigned_to_student(tutor_profile, project.student):
+            raise PermissionDenied("You can only give feedback to your assigned students.")
+
+        project.tutor_feedback = request.data.get('tutor_feedback', project.tutor_feedback)
+        project.status = 'reviewed'
+        project.save(update_fields=['tutor_feedback', 'status'])
+        return Response(StudentProjectSerializer(project).data)
+
+
+class AdminStudentProjectListView(generics.ListAPIView):
+    """Admin: view every student project."""
+    serializer_class = StudentProjectSerializer
+    permission_classes = [permissions.IsAdminUser]
+    queryset = StudentProject.objects.all()
+
+
+class AdminStudentProjectFeatureToggleView(APIView):
+    """Admin: toggle whether a project shows on the public homepage showcase."""
+    permission_classes = [permissions.IsAdminUser]
+
+    def patch(self, request, project_id):
+        project = get_object_or_404(StudentProject, id=project_id)
+        project.is_featured = not project.is_featured
+        project.save(update_fields=['is_featured'])
+        return Response(StudentProjectSerializer(project).data)
+
+
+class FeaturedStudentProjectsView(generics.ListAPIView):
+    """Public: powers the homepage showcase — no more manual posting."""
+    serializer_class = StudentProjectSerializer
+    permission_classes = [AllowAny]
+    queryset = StudentProject.objects.filter(is_featured=True, status='reviewed')

@@ -6,7 +6,10 @@ from .views import (
     AdminCohortDetailView, AdminCohortSessionsView, StopClassSessionView, ApplicationAnalyticsView,
     TutorCapstoneProjectListCreateView, StudentCapstoneProjectsView,
     TutorAssessmentListCreateView, AdminAssessmentListCreateView, StudentAssessmentsView,
-    AssessmentRespondView, AdminOrTutorStudentAssessmentsView, TutorStudentsListView
+    AssessmentRespondView, AdminOrTutorStudentAssessmentsView, TutorStudentsListView, StudentProjectListCreateView, StudentProjectDetailView, StudentProjectSubmitView,
+    TutorStudentProjectsListView, TutorStudentProjectFeedbackView,
+    AdminStudentProjectListView, AdminStudentProjectFeatureToggleView,
+    FeaturedStudentProjectsView,   
 )
 
 urlpatterns = [
@@ -33,4 +36,12 @@ urlpatterns = [
     path('assessments/<int:assessment_id>/respond/', AssessmentRespondView.as_view(), name='assessment-respond'),
     path('assessments/student/<int:student_id>/', AdminOrTutorStudentAssessmentsView.as_view(), name='student-assessments-detail'),
     path('tutor/students/', TutorStudentsListView.as_view(), name='tutor-students-list'),
+    path('projects/mine/', StudentProjectListCreateView.as_view(), name='student-projects'),
+    path('projects/mine/<int:pk>/', StudentProjectDetailView.as_view(), name='student-project-detail'),
+    path('projects/mine/<int:project_id>/submit/', StudentProjectSubmitView.as_view(), name='student-project-submit'),
+    path('projects/tutor/', TutorStudentProjectsListView.as_view(), name='tutor-student-projects'),
+    path('projects/tutor/<int:project_id>/feedback/', TutorStudentProjectFeedbackView.as_view(), name='tutor-project-feedback'),
+    path('projects/admin/', AdminStudentProjectListView.as_view(), name='admin-student-projects'),
+    path('projects/admin/<int:project_id>/toggle-featured/', AdminStudentProjectFeatureToggleView.as_view(), name='admin-project-toggle-featured'),
+    path('projects/featured/', FeaturedStudentProjectsView.as_view(), name='featured-student-projects'),
 ]
