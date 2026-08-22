@@ -447,11 +447,27 @@ class AdminAssessmentListCreateView(generics.ListCreateAPIView):
     """Admin: list all assessments, and post a new one for any student."""
     serializer_class = AssessmentSerializer
     permission_classes = [permissions.IsAdminUser]
-    queryset = Assessment.objects.all()
+
+    def get_queryset(self):
+        qs = Assessment.objects.select_related('student', 'author').order_by('-created_at')
+        cohort_id = self.request.query_params.get('cohort')
+        year = self.request.query_params.get('year')
+        month = self.request.query_params.get('month')
+        today = self.request.query_params.get('today')
+
+        if cohort_id:
+            qs = qs.filter(student__applications__cohort_id=cohort_id).distinct()
+        if today == 'true':
+            qs = qs.filter(created_at__date=timezone.now().date())
+        else:
+            if year:
+                qs = qs.filter(created_at__year=year)
+            if month:
+                qs = qs.filter(created_at__month=month)
+        return qs
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
-
 
 class StudentAssessmentsView(APIView):
     """Student: view all assessments posted to them (for their dashboard)."""
