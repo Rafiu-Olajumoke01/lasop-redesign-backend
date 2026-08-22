@@ -204,3 +204,32 @@ class Assessment(models.Model):
 
     def __str__(self):
         return f"Assessment for {self.student} by {self.author} on {self.created_at.date()}"
+
+class ClassProject(models.Model):
+    capstone_project = models.ForeignKey(
+        CapstoneProject, on_delete=models.CASCADE, related_name='submissions'
+    )
+    student = models.ForeignKey(
+        'users.User', on_delete=models.CASCADE, related_name='class_projects'
+    )
+
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    tech_stack = models.CharField(max_length=255, blank=True)
+    repo_url = models.URLField(blank=True)
+    live_url = models.URLField(blank=True)
+    cover_image = models.ImageField(upload_to='class_projects/covers/', blank=True, null=True)
+    attachment = models.FileField(upload_to='class_projects/files/', blank=True, null=True)
+
+    tutor_rating = models.PositiveSmallIntegerField(null=True, blank=True)
+    tutor_feedback = models.TextField(blank=True)
+    is_featured = models.BooleanField(default=False)
+
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-submitted_at']
+
+    def __str__(self):
+        return f"{self.student} — {self.title}"

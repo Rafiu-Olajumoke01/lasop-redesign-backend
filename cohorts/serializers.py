@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Cohort, ClassSession, Attendance, StudentProject, CapstoneProject, Assessment
+from .models import Cohort, ClassSession, Attendance, StudentProject, CapstoneProject, Assessment, ClassProject
 
 
 
@@ -155,6 +155,46 @@ class PublicStudentProjectSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'description', 'tech_stack_list',
             'repo_url', 'live_url', 'student_name', 'created_at',
+        ]
+
+    def get_student_name(self, obj):
+        s = obj.student
+        return f"{s.first_name} {s.last_name}".strip() or s.email
+
+    def get_tech_stack_list(self, obj):
+        return [t.strip() for t in (obj.tech_stack or '').split(',') if t.strip()]
+
+
+class ClassProjectSerializer(serializers.ModelSerializer):
+    student_name = serializers.SerializerMethodField()
+    capstone_project_title = serializers.CharField(source='capstone_project.title', read_only=True)
+    cohort_name = serializers.CharField(source='capstone_project.cohort.name', read_only=True)
+
+    class Meta:
+        model = ClassProject
+        fields = [
+            'id', 'capstone_project', 'capstone_project_title', 'cohort_name',
+            'student', 'student_name', 'title', 'description', 'tech_stack',
+            'repo_url', 'live_url', 'cover_image', 'attachment',
+            'tutor_rating', 'tutor_feedback', 'is_featured',
+            'submitted_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'student', 'tutor_rating', 'tutor_feedback', 'is_featured', 'submitted_at', 'updated_at']
+
+    def get_student_name(self, obj):
+        full = f"{obj.student.first_name} {obj.student.last_name}".strip()
+        return full or obj.student.email
+
+
+class PublicClassProjectSerializer(serializers.ModelSerializer):
+    student_name = serializers.SerializerMethodField()
+    tech_stack_list = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ClassProject
+        fields = [
+            'id', 'title', 'description', 'tech_stack_list',
+            'repo_url', 'live_url', 'student_name', 'submitted_at',
         ]
 
     def get_student_name(self, obj):

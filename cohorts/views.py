@@ -8,13 +8,15 @@ from rest_framework.permissions import AllowAny
 from .serializers import PublicStudentProjectSerializer
 from exams.models import Exam
 from results.models import Result
-from .models import Cohort, ClassSession, Attendance, CapstoneProject, Assessment
+from .models import Cohort, ClassSession, Attendance, CapstoneProject, Assessment, ClassProject
 from .serializers import (
     ClassSessionSerializer,
     AttendanceSerializer,
     AttendanceStudentSerializer,
     CapstoneProjectSerializer,
     AssessmentSerializer,
+    ClassProjectSerializer,
+    PublicClassProjectSerializer,
 )
 from tutors.permissions import IsTutor
 from django.utils import timezone
@@ -22,6 +24,7 @@ from applications.models import Application
 from rest_framework.exceptions import PermissionDenied
 from .models import StudentProject
 from .serializers import StudentProjectSerializer
+from itertools import chain
 
 
 def is_tutor_assigned_to_student(tutor_profile, student):
@@ -631,11 +634,110 @@ class AdminStudentProjectFeatureToggleView(APIView):
         project.save(update_fields=['is_featured'])
         return Response(StudentProjectSerializer(project).data)
 
-class PublicFeaturedStudentProjectsView(generics.ListAPIView):
-    serializer_class = PublicStudentProjectSerializer
-    permission_classes = [AllowAny]
+
+class StudentClassProjectListCreateView(generics.ListCreateAPIView):
+    """Student: list their own monthly-project submissions, and submit a new one."""
+    serializer_class = ClassProjectSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return StudentProject.objects.filter(
-            is_featured=True, status='submitted'
-        ).order_by('-created_at')
+        return ClassProject.objects.filter(student=self.request.user)
+
+    def perform_create(self, serializer):
+        capstone_project = serializer.validated_data.get('capstone_project')
+        is_in_cohort = Application.objects.filter(
+            student=self.request.user, cohort=capstone_project.cohort
+        ).exists()
+        if not is_in_cohort:
+            raise PermissionDenied("You can only submit to a project posted to your own cohort.")
+        serializer.save(student=self.request.user)
+
+
+class StudentCohortCapstoneProjectsView(APIView):
+    """Student: list the monthly project briefs posted to their cohort, so they know what to attempt."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        course_id = request.query_params.get('course')
+        if not course_id:
+            return Response({'detail': 'course query param is required.'}, status=400)
+
+        application = Application.objects.filter(
+            student=request.user, course_id=course_id
+        ).select_related('cohort').first()
+
+        if not application or not application.cohort:
+            return Response([])
+
+        briefs = CapstoneProject.objects.filter(cohort=application.cohort)
+        return Response(CapstoneProjectSerializer(briefs, many=True).data)
+
+
+class TutorClassProjectListView(generics.ListAPIView):
+    """Tutor: view student submissions against monthly project briefs on their cohorts."""
+    serializer_class = ClassProjectSerializer
+    permission_classes = [IsTutor]
+
+    def get_queryset(self):
+        tutor_profile = self.request.user.tutor_profile
+        return ClassProject.objects.filter(
+            capstone_project__cohort__in=tutor_profile.cohorts.all()
+        ).select_related('student', 'capstone_project')
+
+
+class TutorClassProjectRateView(APIView):
+    """Tutor: rate a submission and leave feedback."""
+    permission_classes = [IsTutor]
+
+    def patch(self, request, submission_id):
+        submission = get_object_or_404(ClassProject, id=submission_id)
+        tutor_profile = request.user.tutor_profile
+
+        if not is_tutor_assigned_to_student(tutor_profile, submission.student):
+            raise PermissionDenied("You can only rate submissions from your assigned students.")
+
+        rating = request.data.get('tutor_rating', submission.tutor_rating)
+        feedback = request.data.get('tutor_feedback', submission.tutor_feedback)
+        submission.tutor_rating = rating
+        submission.tutor_feedback = feedback
+        submission.save(update_fields=['tutor_rating', 'tutor_feedback'])
+        return Response(ClassProjectSerializer(submission).data)
+
+
+class AdminClassProjectListView(generics.ListAPIView):
+    """Admin: view every monthly-project submission across every cohort."""
+    serializer_class = ClassProjectSerializer
+    permission_classes = [permissions.IsAdminUser]
+    queryset = ClassProject.objects.select_related('student', 'capstone_project').all()
+
+
+class AdminClassProjectFeatureToggleView(APIView):
+    """Admin: toggle whether a monthly-project submission shows on the public homepage showcase."""
+    permission_classes = [permissions.IsAdminUser]
+
+    def patch(self, request, submission_id):
+        submission = get_object_or_404(ClassProject, id=submission_id)
+        submission.is_featured = not submission.is_featured
+        submission.save(update_fields=['is_featured'])
+        return Response(ClassProjectSerializer(submission).data)
+
+
+class PublicFeaturedStudentProjectsView(APIView):
+    """
+    Public homepage showcase. Merges featured end-of-program StudentProjects
+    and featured monthly ClassProject submissions into one feed, sorted by
+    date, using the same serialized shape for both so the frontend card
+    can't tell (and doesn't need to tell) which type it's rendering.
+    """
+    permission_classes = [AllowAny]
+    def get(self, request):
+        student_projects = StudentProject.objects.filter(is_featured=True, status='submitted')
+        class_projects = ClassProject.objects.filter(is_featured=True)
+        student_data = PublicStudentProjectSerializer(student_projects, many=True).data
+        class_data = PublicClassProjectSerializer(class_projects, many=True).data
+        combined = sorted(
+            chain(student_data, class_data),
+            key=lambda x: x.get('created_at') or x.get('submitted_at'),
+            reverse=True,
+        )
+        return Response(combined)

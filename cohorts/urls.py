@@ -10,6 +10,9 @@ from .views import (
     TutorStudentProjectsListView, TutorStudentProjectFeedbackView,
     AdminStudentProjectListView, AdminStudentProjectFeatureToggleView,
     PublicFeaturedStudentProjectsView,
+    StudentClassProjectListCreateView, StudentCohortCapstoneProjectsView,
+    TutorClassProjectListView, TutorClassProjectRateView,
+    AdminClassProjectListView, AdminClassProjectFeatureToggleView,
 )
 
 urlpatterns = [
@@ -43,5 +46,12 @@ urlpatterns = [
     path('projects/tutor/<int:project_id>/feedback/', TutorStudentProjectFeedbackView.as_view(), name='tutor-project-feedback'),
     path('projects/admin/', AdminStudentProjectListView.as_view(), name='admin-student-projects'),
     path('projects/admin/<int:project_id>/toggle-featured/', AdminStudentProjectFeatureToggleView.as_view(), name='admin-project-toggle-featured'),
-    path('projects/featured/', PublicFeaturedStudentProjectsView.as_view(), name='featured-student-projects'),
+        path('projects/featured/', PublicFeaturedStudentProjectsView.as_view(), name='featured-student-projects'),
+
+    path('class-projects/mine/', StudentClassProjectListCreateView.as_view(), name='student-class-projects'),
+    path('my-cohort-capstone-projects/', StudentCohortCapstoneProjectsView.as_view(), name='student-cohort-capstone-projects'),
+    path('class-projects/tutor/', TutorClassProjectListView.as_view(), name='tutor-class-projects'),
+    path('class-projects/tutor/<int:submission_id>/rate/', TutorClassProjectRateView.as_view(), name='tutor-class-project-rate'),
+    path('class-projects/admin/', AdminClassProjectListView.as_view(), name='admin-class-projects'),
+    path('class-projects/admin/<int:submission_id>/toggle-featured/', AdminClassProjectFeatureToggleView.as_view(), name='admin-class-project-toggle-featured'),
 ]
