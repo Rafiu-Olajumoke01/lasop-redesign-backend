@@ -104,20 +104,18 @@ class CapstoneProjectSerializer(serializers.ModelSerializer):
 class StudentProjectSerializer(serializers.ModelSerializer):
     student_name = serializers.SerializerMethodField()
     cohort_name = serializers.CharField(source='cohort.name', read_only=True)
+    project_type_label = serializers.CharField(source='get_project_type_display', read_only=True)
 
     class Meta:
         model = StudentProject
         fields = [
             'id', 'student', 'student_name', 'cohort', 'cohort_name',
+            'project_type', 'project_type_label',
             'title', 'description', 'tech_stack', 'repo_url', 'live_url',
             'cover_image', 'attachment', 'status', 'tutor_feedback',
             'is_featured', 'submitted_at', 'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'student', 'status', 'tutor_feedback', 'is_featured', 'submitted_at', 'created_at', 'updated_at']
-
-    def get_student_name(self, obj):
-        full = f"{obj.student.first_name} {obj.student.last_name}".strip()
-        return full or obj.student.email
 
 
 class AssessmentSerializer(serializers.ModelSerializer):

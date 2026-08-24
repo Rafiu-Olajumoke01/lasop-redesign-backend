@@ -155,8 +155,15 @@ class StudentProject(models.Model):
         ('submitted', 'Submitted'),
     ]
 
+    PROJECT_TYPE_CHOICES = [
+        ('capstone', 'Capstone (End of Program)'),
+        ('monthly', 'Monthly / Class Project'),
+    ]
+
     student = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='projects')
     cohort = models.ForeignKey(Cohort, on_delete=models.SET_NULL, null=True, blank=True, related_name='student_projects')
+
+    project_type = models.CharField(max_length=20, choices=PROJECT_TYPE_CHOICES, default='capstone')
 
     title = models.CharField(max_length=255)
     description = models.TextField()
@@ -180,6 +187,7 @@ class StudentProject(models.Model):
     def __str__(self):
         return f"{self.student} — {self.title}"
 
+        
 class Assessment(models.Model):
     student = models.ForeignKey(
         'users.User',
