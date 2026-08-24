@@ -686,7 +686,6 @@ class TutorClassProjectListView(generics.ListAPIView):
 
 
 class TutorClassProjectRateView(APIView):
-    """Tutor: rate a submission and leave feedback."""
     permission_classes = [IsTutor]
 
     def patch(self, request, submission_id):
@@ -705,14 +704,12 @@ class TutorClassProjectRateView(APIView):
 
 
 class AdminClassProjectListView(generics.ListAPIView):
-    """Admin: view every monthly-project submission across every cohort."""
     serializer_class = ClassProjectSerializer
     permission_classes = [permissions.IsAdminUser]
     queryset = ClassProject.objects.select_related('student', 'capstone_project').all()
 
 
 class AdminClassProjectFeatureToggleView(APIView):
-    """Admin: toggle whether a monthly-project submission shows on the public homepage showcase."""
     permission_classes = [permissions.IsAdminUser]
 
     def patch(self, request, submission_id):
@@ -723,12 +720,6 @@ class AdminClassProjectFeatureToggleView(APIView):
 
 
 class PublicFeaturedStudentProjectsView(APIView):
-    """
-    Public homepage showcase. Merges featured end-of-program StudentProjects
-    and featured monthly ClassProject submissions into one feed, sorted by
-    date, using the same serialized shape for both so the frontend card
-    can't tell (and doesn't need to tell) which type it's rendering.
-    """
     permission_classes = [AllowAny]
     def get(self, request):
         student_projects = StudentProject.objects.filter(is_featured=True, status='submitted')
@@ -741,3 +732,19 @@ class PublicFeaturedStudentProjectsView(APIView):
             reverse=True,
         )
         return Response(combined)
+
+class AdminStudentProjectDeleteView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def delete(self, request, project_id):
+        project = get_object_or_404(StudentProject, id=project_id)
+        project.delete()
+        return Response(status=204)
+
+class AdminClassProjectDeleteView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def delete(self, request, submission_id):
+        submission = get_object_or_404(ClassProject, id=submission_id)
+        submission.delete()
+        return Response(status=204)
