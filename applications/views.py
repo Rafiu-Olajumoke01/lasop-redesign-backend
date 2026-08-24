@@ -77,21 +77,24 @@ class GroupedApplicantsView(APIView):
     one card per applicant with all of their course entries inside it.
 
     Bucket rule: a student is "an applicant" as long as at least one of
-    their Application rows has cohort=None (unassigned). The moment every
-    course they've applied for has a cohort, they no longer appear here —
-    they're a student. If they later apply for a new course, a fresh
-    Application row with cohort=None brings them back into this list.
+    their Application rows is still missing ANY of the three promotion
+    gates:
+      1. Cohort assigned
+      2. Tutor assigned
+      3. Latest payment status == paid
 
-    Within an applicant's course list: already-assigned courses (cohort
-    set) come first since they need no review, newly added / unassigned
-    ones come last.
+    The moment every course they've applied for satisfies all three gates,
+    they no longer appear here — they're a student. If they later apply
+    for a new course, a fresh Application row (missing one of the gates)
+    brings them back into this list.
 
-    Applicant ordering: oldest applicant first (first-come-first-served).
-    "Oldest" is anchored to the EARLIEST created_at across all of a
-    student's Application rows — so a returning student (who added a new
-    course after already being converted once) keeps their original queue
-    position rather than jumping to the back of the line. Flagging this as
-    an assumption in case you'd rather anchor on the newest row instead.
+    Within an applicant's course list: fully-completed courses (all three
+    gates satisfied) come first since they need no review, courses still
+    missing a gate come last.
+
+    Applicant ordering: oldest applicant first (first-come-first-served),
+    anchored to the EARLIEST created_at across all of a student's
+    Application rows.
     """
     permission_classes = [IsAuthenticated]
 
@@ -101,20 +104,30 @@ class GroupedApplicantsView(APIView):
 
         applications = Application.objects.select_related(
             'student', 'course', 'cohort', 'cohort__tutor', 'location'
-        )
+        ).prefetch_related('payments')
 
         groups = {}
         for app in applications:
             groups.setdefault(app.student_id, []).append(app)
 
+        def is_pending(a):
+            """An Application still needs review if cohort, tutor, or a
+            confirmed 'paid' payment is missing."""
+            latest_payment = a.payments.order_by('-created_at').first()
+            payment_paid = (
+                latest_payment is not None
+                and latest_payment.status == latest_payment.Status.PAID
+            )
+            return a.cohort_id is None or a.tutor_id is None or not payment_paid
+
         applicant_groups = []
         for apps in groups.values():
-            still_applicant = any(a.cohort_id is None for a in apps)
+            still_applicant = any(is_pending(a) for a in apps)
             if not still_applicant:
                 continue
 
-            completed = sorted((a for a in apps if a.cohort_id is not None), key=lambda a: a.created_at)
-            pending = sorted((a for a in apps if a.cohort_id is None), key=lambda a: a.created_at)
+            completed = sorted((a for a in apps if not is_pending(a)), key=lambda a: a.created_at)
+            pending = sorted((a for a in apps if is_pending(a)), key=lambda a: a.created_at)
 
             applicant_groups.append({
                 'student': apps[0].student,
