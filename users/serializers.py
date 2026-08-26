@@ -60,7 +60,7 @@ class UserSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'first_name', 'last_name', 'email', 'phone_number', 'gender',
             'is_staff', 'is_tutor', 'assigned_tutor', 'assigned_tutor_detail',
-            'guardian_name', 'guardian_email',
+            'guardian_name', 'guardian_email', 'guardian_phone',
         ]
         extra_kwargs = {
             'assigned_tutor': {'write_only': True, 'required': False},
@@ -86,4 +86,4 @@ class StudentDetailSerializer(UserSerializer):
 class ProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['first_name', 'last_name', 'phone_number', 'gender', 'guardian_name', 'guardian_email']
+        fields = ['first_name', 'last_name', 'phone_number', 'gender', 'guardian_name', 'guardian_email', 'guardian_phone']
