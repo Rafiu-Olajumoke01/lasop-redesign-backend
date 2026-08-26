@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
-from .serializers import RegisterSerializer, LoginSerializer, UserSerializer, StudentDetailSerializer
+from .serializers import RegisterSerializer, LoginSerializer, UserSerializer, StudentDetailSerializer, ProfileUpdateSerializer
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
@@ -38,14 +38,6 @@ class LoginView(APIView):
                 'access': str(refresh.access_token),
             }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-class ProfileView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        serializer = StudentDetailSerializer(request.user, context={'request': request})
-        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class StudentListView(APIView):
@@ -144,3 +136,19 @@ class ResetPasswordView(APIView):
 
         return Response({'message': 'Password reset successful'}, status=status.HTTP_200_OK)
 
+class ProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        serializer = StudentDetailSerializer(request.user, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def patch(self, request):
+        serializer = ProfileUpdateSerializer(request.user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                StudentDetailSerializer(request.user, context={'request': request}).data,
+                status=status.HTTP_200_OK,
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

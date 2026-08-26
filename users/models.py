@@ -38,6 +38,9 @@ class User(AbstractUser):
         related_name='students'
     )
 
+    guardian_name = models.CharField(max_length=255, blank=True, null=True)
+    guardian_email = models.EmailField(blank=True, null=True)
+
     groups = models.ManyToManyField(
         'auth.Group',
         related_name='custom_user_set',
