@@ -30,6 +30,20 @@ def notify_guardian_of_assessment(sender, instance, created, **kwargs):
     else:
         tutor_intro = f"{tutor_name}"
 
+    # Star rating, e.g. "★★★★☆" — only shown if the tutor set one
+    rating_stars = None
+    if instance.rating:
+        rating_stars = "★" * instance.rating + "☆" * (5 - instance.rating)
+
+    # HTML snippet for the rating — empty string if no rating was set
+    rating_html = ""
+    if rating_stars:
+        rating_html = f"""
+                    <p style="margin:14px 0 0; color:#d97706; font-size:16px; letter-spacing:2px;">
+                      {rating_stars} <span style="color:#9ca3af; font-size:12px; letter-spacing:normal;">({instance.rating}/5)</span>
+                    </p>
+        """
+
     subject = f"New Assessment for {student_name}"
 
     # Plain text fallback (for email clients that don't render HTML)
@@ -37,6 +51,7 @@ def notify_guardian_of_assessment(sender, instance, created, **kwargs):
         f"Hi {guardian_name},\n\n"
         f"{tutor_intro} just posted a new assessment for {student_name} on {date_str}:\n\n"
         f"\"{instance.content}\"\n\n"
+        f"{f'Rating: {rating_stars} ({instance.rating}/5)' + chr(10) + chr(10) if rating_stars else ''}"
         f"— LASOP"
     )
 
@@ -75,7 +90,7 @@ def notify_guardian_of_assessment(sender, instance, created, **kwargs):
                         </td>
                       </tr>
                     </table>
-
+                    {rating_html}
                     <p style="margin:24px 0 0; color:#9ca3af; font-size:13px; line-height:1.5;">
                       This is an automated notification from LASOP. You're receiving this because you're listed as the guardian for {student_name}.
                     </p>
@@ -85,7 +100,7 @@ def notify_guardian_of_assessment(sender, instance, created, **kwargs):
                 <!-- Footer -->
                 <tr>
                   <td style="background-color:#f9fafb; padding:16px 32px; text-align:center;">
-                    <p style="margin:0; color:#9ca3af; font-size:12px;">&copy; LASOP — Lagos School Of Programming</p>
+                    <p style="margin:0; color:#9ca3af; font-size:12px;">&copy; LASOP — Cohort-Based Coding School</p>
                   </td>
                 </tr>
 
