@@ -202,3 +202,28 @@ class PublicClassProjectSerializer(serializers.ModelSerializer):
     def get_tech_stack_list(self, obj):
         return [t.strip() for t in (obj.tech_stack or '').split(',') if t.strip()]
 
+class AssessmentSerializer(serializers.ModelSerializer):
+    author_name = serializers.SerializerMethodField()
+    student_name = serializers.SerializerMethodField()
+    cohort_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Assessment
+        fields = [
+            'id', 'student', 'student_name', 'author', 'author_name',
+            'content', 'rating', 'created_at', 'updated_at',
+            'student_response', 'responded_at', 'cohort_name',
+        ]
+        read_only_fields = ['id', 'author', 'created_at', 'updated_at', 'responded_at']
+
+    def get_author_name(self, obj):
+        full = f"{obj.author.first_name} {obj.author.last_name}".strip()
+        return full or obj.author.email
+
+    def get_student_name(self, obj):
+        full = f"{obj.student.first_name} {obj.student.last_name}".strip()
+        return full or obj.student.email
+
+    def get_cohort_name(self, obj):
+        app = obj.student.applications.filter(cohort__isnull=False).order_by('-created_at').first()
+        return app.cohort.name if app else None
