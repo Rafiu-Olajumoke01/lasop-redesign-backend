@@ -30,18 +30,28 @@ def notify_guardian_of_assessment(sender, instance, created, **kwargs):
     else:
         tutor_intro = f"{tutor_name}"
 
-    # Star rating, e.g. "★★★★☆" — only shown if the tutor set one
-    rating_stars = None
-    if instance.rating:
-        rating_stars = "★" * instance.rating + "☆" * (5 - instance.rating)
+    # Convert the 1-5 rating into a percentage score, e.g. 4 -> 80%
+    rating_percent = instance.rating * 20 if instance.rating else None
 
-    # HTML snippet for the rating — empty string if no rating was set
+    # HTML snippet for the rating — a colored badge, empty string if no rating was set
     rating_html = ""
-    if rating_stars:
+    if rating_percent:
+        if rating_percent >= 80:
+            badge_bg, badge_text, badge_border = "#ecfdf5", "#059669", "#a7f3d0"
+        elif rating_percent >= 50:
+            badge_bg, badge_text, badge_border = "#fffbeb", "#d97706", "#fde68a"
+        else:
+            badge_bg, badge_text, badge_border = "#fef2f2", "#dc2626", "#fecaca"
+
         rating_html = f"""
-                    <p style="margin:14px 0 0; color:#d97706; font-size:16px; letter-spacing:2px;">
-                      {rating_stars} <span style="color:#9ca3af; font-size:12px; letter-spacing:normal;">({instance.rating}/5)</span>
-                    </p>
+                    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:16px 0 0;">
+                      <tr>
+                        <td style="background-color:{badge_bg}; border:1px solid {badge_border}; border-radius:999px; padding:6px 16px;">
+                          <span style="color:{badge_text}; font-size:14px; font-weight:700; letter-spacing:0.2px;">{rating_percent}%</span>
+                          <span style="color:{badge_text}; font-size:11px; font-weight:600; opacity:0.75; text-transform:uppercase; letter-spacing:0.4px; margin-left:4px;">Performance Score</span>
+                        </td>
+                      </tr>
+                    </table>
         """
 
     subject = f"New Assessment for {student_name}"
@@ -51,7 +61,7 @@ def notify_guardian_of_assessment(sender, instance, created, **kwargs):
         f"Hi {guardian_name},\n\n"
         f"{tutor_intro} just posted a new assessment for {student_name} on {date_str}:\n\n"
         f"\"{instance.content}\"\n\n"
-        f"{f'Rating: {rating_stars} ({instance.rating}/5)' + chr(10) + chr(10) if rating_stars else ''}"
+        f"{f'Performance score: {rating_percent}%' + chr(10) + chr(10) if rating_percent else ''}"
         f"— LASOP"
     )
 
