@@ -13,6 +13,7 @@ from .views import (
     StudentClassProjectListCreateView, StudentCohortCapstoneProjectsView,
     TutorClassProjectListView, TutorClassProjectRateView,
     AdminClassProjectListView, AdminClassProjectFeatureToggleView, AdminClassProjectDeleteView,
+    PublicAllStudentProjectsView,
 )
 
 urlpatterns = [
@@ -48,6 +49,7 @@ urlpatterns = [
     path('projects/admin/<int:project_id>/toggle-featured/', AdminStudentProjectFeatureToggleView.as_view(), name='admin-project-toggle-featured'),
     path('projects/admin/<int:project_id>/', AdminStudentProjectDeleteView.as_view(), name='admin-project-delete'),
     path('projects/featured/', PublicFeaturedStudentProjectsView.as_view(), name='featured-student-projects'),
+    path('projects/all/', PublicAllStudentProjectsView.as_view(), name='all-student-projects'),
 
     path('class-projects/mine/', StudentClassProjectListCreateView.as_view(), name='student-class-projects'),
     path('my-cohort-capstone-projects/', StudentCohortCapstoneProjectsView.as_view(), name='student-cohort-capstone-projects'),

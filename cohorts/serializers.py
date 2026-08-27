@@ -201,3 +201,4 @@ class PublicClassProjectSerializer(serializers.ModelSerializer):
 
     def get_tech_stack_list(self, obj):
         return [t.strip() for t in (obj.tech_stack or '').split(',') if t.strip()]
+
