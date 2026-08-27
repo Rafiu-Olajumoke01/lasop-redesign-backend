@@ -85,7 +85,7 @@ def notify_guardian_of_assessment(sender, instance, created, **kwargs):
                 <!-- Footer -->
                 <tr>
                   <td style="background-color:#f9fafb; padding:16px 32px; text-align:center;">
-                    <p style="margin:0; color:#9ca3af; font-size:12px;">&copy; LASOP — Cohort-Based Coding School</p>
+                    <p style="margin:0; color:#9ca3af; font-size:12px;">&copy; LASOP — Lagos School Of Programming</p>
                   </td>
                 </tr>
 
