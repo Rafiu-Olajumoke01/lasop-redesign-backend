@@ -48,10 +48,11 @@ class ClassSessionSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'cohort', 'cohort_name', 'tutor', 'title', 'topics_covered',
             'lesson_outcome', 'date', 'start_time', 'end_time', 'duration_hours',
-            'started_at', 'ended_at', 'attendance_marked', 'created_at',
+            'started_at', 'ended_at', 'start_latitude', 'start_longitude',
+            'end_latitude', 'end_longitude', 'attendance_marked', 'created_at',
         ]
         extra_kwargs = {'tutor': {'required': False}}
-        read_only_fields = ['started_at', 'ended_at']
+        read_only_fields = ['started_at', 'ended_at', 'start_latitude', 'start_longitude', 'end_latitude', 'end_longitude']
 
     def get_attendance_marked(self, obj):
         return Attendance.objects.filter(session=obj).exists()

@@ -106,8 +106,12 @@ class TutorClassSessionListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         tutor = self.request.user.tutor_profile
-        serializer.save(tutor=tutor, started_at=timezone.now())
-
+        serializer.save(
+            tutor=tutor,
+            started_at=timezone.now(),
+            start_latitude=self.request.data.get('latitude') or None,
+            start_longitude=self.request.data.get('longitude') or None,
+        )
 
 class SessionRosterView(APIView):
     permission_classes = [IsTutor]
@@ -323,9 +327,10 @@ class StopClassSessionView(APIView):
         if session.ended_at:
             return Response({'detail': 'This session has already been stopped.'}, status=400)
         session.ended_at = timezone.now()
-        session.save(update_fields=['ended_at'])
+        session.end_latitude = request.data.get('latitude') or None
+        session.end_longitude = request.data.get('longitude') or None
+        session.save(update_fields=['ended_at', 'end_latitude', 'end_longitude'])
         return Response(ClassSessionSerializer(session).data)
-
 
 class ApplicationAnalyticsView(APIView):
     """Admin-only: attendance + timeline analytics for a single Application (course)."""
