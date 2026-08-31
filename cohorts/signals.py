@@ -74,7 +74,7 @@ def notify_guardian_of_assessment(sender, instance, created, **kwargs):
     text_body = (
         f"Hi {guardian_name},\n\n"
         f"{tutor_intro} just posted a new assessment for {student_name} on {date_str}:\n\n"
-        f"Topic: {instance.topic}\n\n"
+        f"Topic: {instance.assessed_on}\n\n"
         f"What {student_name} did: \"{instance.student_answer}\"\n\n"
         f"{observation_text_block}"
         f"{f'Performance score: {rating_percent}%' + chr(10) + chr(10) if rating_percent else ''}"
@@ -108,7 +108,7 @@ def notify_guardian_of_assessment(sender, instance, created, **kwargs):
                     </p>
 
                     <p style="margin:0 0 4px; color:#111827; font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Topic</p>
-                    <p style="margin:0 0 16px; color:#374151; font-size:15px; line-height:1.5;">{instance.topic}</p>
+                    <p style="margin:0 0 16px; color:#374151; font-size:15px; line-height:1.5;">{instance.assessed_on}</p>
 
                     <table role="presentation" width="100%" style="background-color:#f9fafb; border-left:4px solid #2563eb; border-radius:6px;">
                       <tr>
