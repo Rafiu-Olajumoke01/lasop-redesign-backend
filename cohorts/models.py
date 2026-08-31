@@ -191,32 +191,6 @@ class StudentProject(models.Model):
     def __str__(self):
         return f"{self.student} — {self.title}"
 
-        
-class Assessment(models.Model):
-    student = models.ForeignKey(
-        'users.User',
-        on_delete=models.CASCADE,
-        related_name='assessments_received'
-    )
-    author = models.ForeignKey(
-        'users.User',
-        on_delete=models.CASCADE,
-        related_name='assessments_given'
-    )
-    content = models.TextField() 
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    # Optional student response
-    student_response = models.TextField(null=True, blank=True)
-    responded_at = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return f"Assessment for {self.student} by {self.author} on {self.created_at.date()}"
-
 class ClassProject(models.Model):
     capstone_project = models.ForeignKey(
         CapstoneProject, on_delete=models.CASCADE, related_name='submissions'
@@ -258,8 +232,10 @@ class Assessment(models.Model):
         on_delete=models.CASCADE,
         related_name='assessments_given'
     )
-    content = models.TextField()
-    rating = models.PositiveSmallIntegerField(null=True, blank=True)  # 1–5 star rating   ← NEW LINE
+    assessed_on = models.TextField(default='')
+    student_answer = models.TextField(default='')
+    tutor_observation = models.TextField(blank=True, null=True)
+    rating = models.PositiveSmallIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

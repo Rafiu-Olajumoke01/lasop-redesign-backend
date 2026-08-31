@@ -54,13 +54,29 @@ def notify_guardian_of_assessment(sender, instance, created, **kwargs):
                     </table>
         """
 
+    # Optional tutor observation — only show if the tutor actually filled it in
+    observation_text_block = (
+        f"Tutor's note: {instance.tutor_observation}\n\n"
+        if instance.tutor_observation else ""
+    )
+    observation_html_block = (
+        f"""
+                    <p style="margin:16px 0 0; color:#374151; font-size:14px; line-height:1.6;">
+                      <strong>Tutor's note:</strong> {instance.tutor_observation}
+                    </p>
+        """
+        if instance.tutor_observation else ""
+    )
+
     subject = f"New Assessment for {student_name}"
 
     # Plain text fallback (for email clients that don't render HTML)
     text_body = (
         f"Hi {guardian_name},\n\n"
         f"{tutor_intro} just posted a new assessment for {student_name} on {date_str}:\n\n"
-        f"\"{instance.content}\"\n\n"
+        f"Topic: {instance.topic}\n\n"
+        f"What {student_name} did: \"{instance.student_answer}\"\n\n"
+        f"{observation_text_block}"
         f"{f'Performance score: {rating_percent}%' + chr(10) + chr(10) if rating_percent else ''}"
         f"— LASOP"
     )
@@ -91,15 +107,20 @@ def notify_guardian_of_assessment(sender, instance, created, **kwargs):
                       Hi {guardian_name}, <strong>{tutor_intro}</strong> shared a new assessment for {student_name} on {date_str}.
                     </p>
 
+                    <p style="margin:0 0 4px; color:#111827; font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Topic</p>
+                    <p style="margin:0 0 16px; color:#374151; font-size:15px; line-height:1.5;">{instance.topic}</p>
+
                     <table role="presentation" width="100%" style="background-color:#f9fafb; border-left:4px solid #2563eb; border-radius:6px;">
                       <tr>
                         <td style="padding:16px 20px;">
+                          <p style="margin:0 0 4px; color:#111827; font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">What {student_name} did</p>
                           <p style="margin:0; color:#111827; font-size:15px; line-height:1.6; font-style:italic;">
-                            &ldquo;{instance.content}&rdquo;
+                            &ldquo;{instance.student_answer}&rdquo;
                           </p>
                         </td>
                       </tr>
                     </table>
+                    {observation_html_block}
                     {rating_html}
                     <p style="margin:24px 0 0; color:#9ca3af; font-size:13px; line-height:1.5;">
                       This is an automated notification from LASOP. You're receiving this because you're listed as the guardian for {student_name}.
