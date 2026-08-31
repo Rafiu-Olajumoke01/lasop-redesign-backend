@@ -883,7 +883,8 @@ class AssessmentSerializer(serializers.ModelSerializer):
         model = Assessment
         fields = [
             'id', 'student', 'student_name', 'author', 'author_name',
-            'content', 'created_at', 'updated_at',
+            'assessed_on', 'student_answer', 'tutor_observation',
+            'created_at', 'updated_at',
             'student_response', 'responded_at', 'cohort_name',
         ]
         read_only_fields = ['id', 'author', 'created_at', 'updated_at', 'responded_at']
@@ -900,6 +901,7 @@ class AssessmentSerializer(serializers.ModelSerializer):
         app = obj.student.applications.filter(cohort__isnull=False).order_by('-created_at').first()
         return app.cohort.name if app else None
 
+    
 class PublicStudentProjectSerializer(serializers.ModelSerializer):
     student_name = serializers.SerializerMethodField()
     tech_stack_list = serializers.SerializerMethodField()
