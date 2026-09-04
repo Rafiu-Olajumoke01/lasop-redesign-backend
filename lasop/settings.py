@@ -25,8 +25,10 @@ PAYSTACK_PUBLIC_KEY = os.environ.get('PAYSTACK_PUBLIC_KEY', '')
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
+    'channels',
     'rest_framework',
-    'corsheaders', 
+    'corsheaders',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -35,6 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     # Local apps
+    'chats',
     'users',
     'courses',
     'applications',
@@ -76,12 +79,23 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'lasop.wsgi.application'
 
+ASGI_APPLICATION = 'lasop.asgi.application'
+
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 DATABASES = {
     'default': dj_database_url.config(default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
+}
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379/0')],
+        },
+    },
 }
 
 AUTH_USER_MODEL = 'users.User'
