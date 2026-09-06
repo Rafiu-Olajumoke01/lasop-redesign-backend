@@ -1,9 +1,13 @@
 from urllib.parse import parse_qs
 
-from channels.db import database_sync_to_async
 from channels.middleware import BaseMiddleware
-from django.contrib.auth.models import AnonymousUser
 from rest_framework_simplejwt.tokens import AccessToken
+
+from .authentication import SimpleUser
+
+
+class AnonymousSimpleUser:
+    is_authenticated = False
 
 
 class JWTAuthMiddleware(BaseMiddleware):
@@ -12,19 +16,20 @@ class JWTAuthMiddleware(BaseMiddleware):
         params = parse_qs(query_string)
         token = params.get('token', [None])[0]
 
-        scope['user'] = await self.get_user(token)
+        scope['user'] = self.get_user(token)
         return await super().__call__(scope, receive, send)
 
-    @database_sync_to_async
     def get_user(self, token):
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
-
         if not token:
-            return AnonymousUser()
+            return AnonymousSimpleUser()
         try:
             access_token = AccessToken(token)
-            user = User.objects.get(id=access_token['user_id'])
-            return user
+            return SimpleUser(
+                user_id=access_token['user_id'],
+                username=access_token.get('username', ''),
+                full_name=access_token.get('full_name', ''),
+                is_tutor=access_token.get('is_tutor', False),
+                is_staff=access_token.get('is_staff', False),
+            )
         except Exception:
-            return AnonymousUser()
+            return AnonymousSimpleUser()
