@@ -135,9 +135,17 @@ CORS_ALLOWED_ORIGINS = [
     "https://lasop.net",
     "https://www.lasop.net",
     "https://lasop-redesign-frontend.vercel.app",
+    "https://lasop-redesign-backend.onrender.com",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://lasop.net",
+    "https://www.lasop.net",
+    "https://lasop-redesign-frontend.vercel.app",
+    "https://lasop-redesign-backend.onrender.com",
+]
 
 
 MEDIA_URL = '/media/'
