@@ -60,13 +60,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def check_participant(self):
         from .models import ConversationParticipant
         return ConversationParticipant.objects.filter(
-            conversation_id=self.conversation_id, user=self.user
+            conversation_id=self.conversation_id, user_id=self.user.id
         ).exists()
 
     @database_sync_to_async
     def save_message(self, content):
         from .models import Conversation, Message
         conversation = Conversation.objects.get(id=self.conversation_id)
-        message = Message.objects.create(conversation=conversation, sender=self.user, content=content)
+        message = Message.objects.create(
+            conversation=conversation,
+            sender_id=self.user.id,
+            sender_name=self.user.get_full_name() or self.user.get_username(),
+            content=content,
+        )
         Conversation.objects.filter(id=self.conversation_id).update(updated_at=timezone.now())
         return message

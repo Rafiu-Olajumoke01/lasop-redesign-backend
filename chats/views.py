@@ -14,7 +14,7 @@ class ConversationListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         return (
             Conversation.objects
-            .filter(participants__user=self.request.user)
+            .filter(participants__user_id=self.request.user.id)
             .order_by('-updated_at')
             .distinct()
         )
@@ -44,8 +44,10 @@ class MessageHistoryView(generics.ListAPIView):
 
     def get_queryset(self):
         conversation_id = self.kwargs['conversation_id']
-        conversation = get_object_or_404(Conversation, id=conversation_id, participants__user=self.request.user)
-        queryset = conversation.messages.select_related('sender').order_by('-created_at')
+        conversation = get_object_or_404(
+            Conversation, id=conversation_id, participants__user_id=self.request.user.id
+        )
+        queryset = conversation.messages.order_by('-created_at')
 
         before = self.request.query_params.get('before')
         if before:
@@ -59,7 +61,9 @@ class MarkConversationReadView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, conversation_id):
-        participant = get_object_or_404(ConversationParticipant, conversation_id=conversation_id, user=request.user)
+        participant = get_object_or_404(
+            ConversationParticipant, conversation_id=conversation_id, user_id=request.user.id
+        )
         participant.last_read_at = timezone.now()
         participant.save(update_fields=['last_read_at'])
         return Response({'status': 'ok'})

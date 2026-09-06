@@ -4,27 +4,16 @@ from .models import Conversation, ConversationParticipant, Message
 
 
 class MessageSerializer(serializers.ModelSerializer):
-    sender_name = serializers.SerializerMethodField()
-
     class Meta:
         model = Message
-        fields = ['id', 'conversation', 'sender', 'sender_name', 'content', 'created_at', 'edited_at']
-        read_only_fields = ['id', 'sender', 'sender_name', 'created_at', 'edited_at']
-
-    def get_sender_name(self, obj):
-        return obj.sender.get_full_name() or obj.sender.get_username()
+        fields = ['id', 'conversation', 'sender_id', 'sender_name', 'content', 'created_at', 'edited_at']
+        read_only_fields = ['id', 'sender_id', 'sender_name', 'created_at', 'edited_at']
 
 
 class ConversationParticipantSerializer(serializers.ModelSerializer):
-    username = serializers.CharField(source='user.username', read_only=True)
-    full_name = serializers.SerializerMethodField()
-
     class Meta:
         model = ConversationParticipant
-        fields = ['id', 'user', 'username', 'full_name', 'joined_at', 'last_read_at']
-
-    def get_full_name(self, obj):
-        return obj.user.get_full_name() or obj.user.username
+        fields = ['id', 'user_id', 'username', 'full_name', 'joined_at', 'last_read_at']
 
 
 class ConversationSerializer(serializers.ModelSerializer):
@@ -35,7 +24,7 @@ class ConversationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Conversation
         fields = [
-            'id', 'conversation_type', 'name', 'cohort', 'created_at',
+            'id', 'conversation_type', 'name', 'cohort_id', 'created_at',
             'updated_at', 'participants', 'last_message', 'unread_count',
         ]
 
@@ -49,27 +38,39 @@ class ConversationSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if not request:
             return 0
-        participant = obj.participants.filter(user=request.user).first()
+        participant = obj.participants.filter(user_id=request.user.id).first()
         if not participant:
             return 0
-        qs = obj.messages.exclude(sender=request.user)
+        qs = obj.messages.exclude(sender_id=request.user.id)
         if participant.last_read_at:
             qs = qs.filter(created_at__gt=participant.last_read_at)
         return qs.count()
+
+
+class ParticipantInputSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    username = serializers.CharField()
+    full_name = serializers.CharField(required=False, allow_blank=True)
 
 
 class ConversationCreateSerializer(serializers.Serializer):
     conversation_type = serializers.ChoiceField(choices=Conversation.TYPE_CHOICES, default=Conversation.DIRECT)
     name = serializers.CharField(required=False, allow_blank=True)
     cohort_id = serializers.IntegerField(required=False)
-    participant_ids = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)
+    participants = ParticipantInputSerializer(many=True)
 
     def create(self, validated_data):
         request = self.context['request']
-        participant_ids = set(validated_data['participant_ids'])
-        participant_ids.add(request.user.id)
+        participants_data = {p['id']: p for p in validated_data['participants']}
+
+        participants_data[request.user.id] = {
+            'id': request.user.id,
+            'username': request.user.username,
+            'full_name': getattr(request.user, 'full_name', request.user.username),
+        }
 
         conversation_type = validated_data.get('conversation_type', Conversation.DIRECT)
+        participant_ids = set(participants_data.keys())
 
         if conversation_type == Conversation.DIRECT and len(participant_ids) == 2:
             existing = (
@@ -88,6 +89,12 @@ class ConversationCreateSerializer(serializers.Serializer):
             cohort_id=validated_data.get('cohort_id'),
         )
         ConversationParticipant.objects.bulk_create([
-            ConversationParticipant(conversation=conversation, user_id=uid) for uid in participant_ids
+            ConversationParticipant(
+                conversation=conversation,
+                user_id=p['id'],
+                username=p['username'],
+                full_name=p.get('full_name', ''),
+            )
+            for p in participants_data.values()
         ])
         return conversation

@@ -19,6 +19,12 @@ class RegisterView(APIView):
         if serializer.is_valid():
             user = serializer.save()
             refresh = RefreshToken.for_user(user)
+
+            refresh['username'] = user.email
+            refresh['full_name'] = f"{user.first_name} {user.last_name}".strip()
+            refresh['is_tutor'] = user.is_tutor
+            refresh['is_staff'] = user.is_staff
+
             return Response({
                 'message': 'Account created successfully',
                 'refresh': str(refresh),
@@ -26,13 +32,20 @@ class RegisterView(APIView):
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 class LoginView(APIView):
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.validated_data
             refresh = RefreshToken.for_user(user)
+
+            # Add extra info to the token so other services (like chat)
+            # can identify the user without a database lookup
+            refresh['username'] = user.email
+            refresh['full_name'] = f"{user.first_name} {user.last_name}".strip()
+            refresh['is_tutor'] = user.is_tutor
+            refresh['is_staff'] = user.is_staff
+
             return Response({
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),

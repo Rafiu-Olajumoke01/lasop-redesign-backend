@@ -16,4 +16,9 @@ urlpatterns = [
     path('api/certificate/', include('certificate.urls')),
     path('api/', include('payments.urls')),
     re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+]
+
+if getattr(settings, 'ENABLE_CHAT', False):
+    urlpatterns.append(path('api/chats/', include('chats.urls')))
+
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

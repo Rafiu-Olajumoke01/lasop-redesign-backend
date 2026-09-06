@@ -21,12 +21,15 @@ ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',')
 PAYSTACK_SECRET_KEY = os.environ.get('PAYSTACK_SECRET_KEY', '')
 PAYSTACK_PUBLIC_KEY = os.environ.get('PAYSTACK_PUBLIC_KEY', '')
 
+# Set to True only on the Render chat service. Left unset (False) on
+# cPanel, which has no chat-related packages installed and no access
+# to this service's separate chat database.
+ENABLE_CHAT = os.environ.get('ENABLE_CHAT', 'False') == 'True'
+
 
 # Application definition
 
 INSTALLED_APPS = [
-    'daphne',
-    'channels',
     'rest_framework',
     'corsheaders',
     'django.contrib.admin',
@@ -37,7 +40,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     # Local apps
-    'chats',
     'users',
     'courses',
     'applications',
@@ -48,6 +50,9 @@ INSTALLED_APPS = [
     'tutors',
     'certificate',
 ]
+
+if ENABLE_CHAT:
+    INSTALLED_APPS = ['daphne', 'channels'] + INSTALLED_APPS + ['chats']
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -79,7 +84,13 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'lasop.wsgi.application'
 
-ASGI_APPLICATION = 'lasop.asgi.application'
+if ENABLE_CHAT:
+    ASGI_APPLICATION = 'lasop.asgi.application'
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        },
+    }
 
 
 # Database
@@ -89,12 +100,6 @@ DATABASES = {
     'default': dj_database_url.config(default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
 }
 
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels.layers.InMemoryChannelLayer',
-    },
-}
-
 AUTH_USER_MODEL = 'users.User'
 
 SIMPLE_JWT = {
@@ -102,11 +107,18 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
 }
 
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ),
-}
+if ENABLE_CHAT:
+    REST_FRAMEWORK = {
+        'DEFAULT_AUTHENTICATION_CLASSES': (
+            'chats.authentication.TokenClaimsAuthentication',
+        ),
+    }
+else:
+    REST_FRAMEWORK = {
+        'DEFAULT_AUTHENTICATION_CLASSES': (
+            'rest_framework_simplejwt.authentication.JWTAuthentication',
+        ),
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
