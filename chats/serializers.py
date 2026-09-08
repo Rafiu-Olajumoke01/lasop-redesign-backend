@@ -1,6 +1,26 @@
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
+from tutors.models import Tutor
 
 from .models import Conversation, ConversationParticipant, Message
+
+User = get_user_model()
+
+ROLE_ADMIN = 'admin'
+ROLE_TUTOR = 'tutor'
+ROLE_STUDENT = 'student'
+
+
+def get_user_role(user_id):
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return None
+    if user.is_staff:
+        return ROLE_ADMIN
+    if Tutor.objects.filter(user_id=user_id).exists():
+        return ROLE_TUTOR
+    return ROLE_STUDENT
 
 
 class MessageSerializer(serializers.ModelSerializer):
@@ -58,6 +78,25 @@ class ConversationCreateSerializer(serializers.Serializer):
     name = serializers.CharField(required=False, allow_blank=True)
     cohort_id = serializers.IntegerField(required=False)
     participants = ParticipantInputSerializer(many=True)
+
+    def validate(self, data):
+        request = self.context['request']
+        conversation_type = data.get('conversation_type', Conversation.DIRECT)
+
+        if conversation_type != Conversation.DIRECT:
+            return data
+
+        participant_ids = {p['id'] for p in data['participants']}
+        participant_ids.add(request.user.id)
+
+        if len(participant_ids) != 2:
+            return data
+
+        roles = {uid: get_user_role(uid) for uid in participant_ids}
+        if set(roles.values()) == {ROLE_STUDENT}:
+            raise serializers.ValidationError('Students cannot message other students.')
+
+        return data
 
     def create(self, validated_data):
         request = self.context['request']
