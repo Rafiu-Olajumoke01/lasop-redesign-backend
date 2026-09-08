@@ -976,3 +976,31 @@ class PublicAllStudentProjectsView(APIView):
             reverse=True,
         )
         return Response(combined)
+
+class AdminCohortChatRosterView(APIView):
+    """Admin: get every student in a cohort, shaped for creating a chat conversation."""
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request, cohort_id):
+        cohort = get_object_or_404(Cohort, id=cohort_id)
+        applications = Application.objects.filter(cohort=cohort).select_related('student')
+
+        seen = set()
+        participants = []
+        for app in applications:
+            student = app.student
+            if student.id in seen:
+                continue
+            seen.add(student.id)
+            full_name = f"{student.first_name} {student.last_name}".strip()
+            participants.append({
+                'id': student.id,
+                'username': student.email,
+                'full_name': full_name or student.email,
+            })
+
+        return Response({
+            'cohort_id': cohort.id,
+            'cohort_name': cohort.name,
+            'participants': participants,
+        })
