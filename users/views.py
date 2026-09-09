@@ -88,6 +88,21 @@ class AssignTutorView(APIView):
         student.save()
         serializer = UserSerializer(student)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+class StudentDeleteView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def delete(self, request, user_id):
+        try:
+            student = User.objects.get(id=user_id, is_tutor=False, is_staff=False)
+        except User.DoesNotExist:
+            return Response({'error': 'Student not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        student.delete()
+        return Response(
+            {'message': 'Student account and all related records permanently deleted.'},
+            status=status.HTTP_204_NO_CONTENT,
+        )
     
 class StudentDetailView(APIView):
     """Admin-only: full details of a single student, including certificate status."""
