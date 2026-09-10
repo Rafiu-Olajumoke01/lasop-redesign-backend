@@ -264,6 +264,18 @@ class AdminCohortDetailView(APIView):
         for row in counted:
             status_counts[row['status']] = row['count']
 
+        applications = Application.objects.filter(cohort=cohort).select_related('student')
+        students_list = [
+            {
+                'application_id': app.id,
+                'student_id': app.student_id,
+                'student_name': app.student.get_full_name() or app.student.email,
+                'student_email': app.student.email,
+                'status': app.status,
+            }
+            for app in applications
+        ]
+
         tutor_name = None
         if cohort.tutor and cohort.tutor.user:
             full = f"{cohort.tutor.user.first_name} {cohort.tutor.user.last_name}".strip()
@@ -306,6 +318,7 @@ class AdminCohortDetailView(APIView):
                 'withdrawn': status_counts.get('withdrawn', 0),
                 'total': sum(status_counts.values()),
             },
+            'students': students_list,
             'today': today_data,
         })
 
