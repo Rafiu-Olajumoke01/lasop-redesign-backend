@@ -112,6 +112,17 @@ class ClassSession(models.Model):
         return round((end - start).seconds / 3600, 2)
 
     @property
+    def actual_duration_minutes(self):
+        """Real time spent: attendance-marked (started_at) to stop (ended_at). None if not stopped yet."""
+        if self.started_at and self.ended_at:
+            return round((self.ended_at - self.started_at).total_seconds() / 60)
+        return None
+
+    @property
+    def is_in_progress(self):
+        return bool(self.started_at) and not self.ended_at
+
+    @property
     def roster(self):
         return self.cohort.applications.select_related('student').all()
 

@@ -200,13 +200,6 @@ class AdminCohortsTodayView(APIView):
         data = []
         for session in sessions_today:
             attendance_taken = session.attendance_records.exists()
-
-            actual_duration_minutes = None
-            if session.started_at and session.ended_at:
-                actual_duration_minutes = round(
-                    (session.ended_at - session.started_at).total_seconds() / 60
-                )
-
             data.append({
                 'cohort_id': session.cohort_id,
                 'cohort_name': session.cohort.name,
@@ -214,12 +207,13 @@ class AdminCohortsTodayView(APIView):
                 'tutor': session.tutor.user.get_full_name() if session.tutor else None,
                 'start_time': session.start_time,
                 'end_time': session.end_time,
+                'created_at': session.created_at,
                 'started_at': session.started_at,
                 'ended_at': session.ended_at,
-                'actual_duration_minutes': actual_duration_minutes,
+                'actual_duration_minutes': session.actual_duration_minutes,
+                'is_in_progress': session.is_in_progress,
                 'attendance_taken': attendance_taken,
             })
-
         return Response(data)
 
 
