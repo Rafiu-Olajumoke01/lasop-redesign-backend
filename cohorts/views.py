@@ -104,6 +104,21 @@ class TutorClassSessionListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         return ClassSession.objects.filter(tutor__user=self.request.user)
 
+    def create(self, request, *args, **kwargs):
+        cohort_id = request.data.get('cohort')
+        date = request.data.get('date')
+        if cohort_id and date:
+            existing = ClassSession.objects.filter(cohort_id=cohort_id, date=date).first()
+            if existing:
+                return Response(
+                    {
+                        'detail': 'A class session already exists for this cohort on this date.',
+                        'existing_session': ClassSessionSerializer(existing).data,
+                    },
+                    status=409,
+                )
+        return super().create(request, *args, **kwargs)
+
     def perform_create(self, serializer):
         # NOTE: started_at is intentionally NOT set here anymore.
         # The official "class begun" timestamp is the moment the tutor
@@ -356,6 +371,42 @@ class StopClassSessionView(APIView):
         session.save(update_fields=['ended_at', 'end_latitude', 'end_longitude'])
         return Response(ClassSessionSerializer(session).data)
 
+
+class TutorClassSessionDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Tutor: view/edit/delete one of their own sessions — used to resolve
+    a pre-created 'future' session found on the day it's due (edit it,
+    or delete it to make way for a fresh one)."""
+    serializer_class = ClassSessionSerializer
+    permission_classes = [IsTutor]
+
+    def get_queryset(self):
+        return ClassSession.objects.filter(tutor__user=self.request.user)
+
+    def perform_destroy(self, instance):
+        if instance.attendance_records.exists():
+            raise PermissionDenied("Can't delete a session attendance has already been marked for.")
+        instance.delete()
+
+
+class TutorTodaySessionView(APIView):
+    """Tutor: check whether a session already exists for a given cohort + date
+    (defaults to today). Dashboard calls this before showing 'create session'
+    so an existing future-dated session can be confirmed, edited, or deleted
+    instead of silently duplicated."""
+    permission_classes = [IsTutor]
+
+    def get(self, request):
+        cohort_id = request.query_params.get('cohort')
+        if not cohort_id:
+            return Response({'detail': 'cohort query param is required.'}, status=400)
+        date = request.query_params.get('date') or timezone.now().date()
+        session = ClassSession.objects.filter(
+            tutor__user=request.user, cohort_id=cohort_id, date=date
+        ).first()
+        if not session:
+            return Response(None)
+        return Response(ClassSessionSerializer(session).data)
+    
 class ApplicationAnalyticsView(APIView):
     """Admin-only: attendance + timeline analytics for a single Application (course)."""
     permission_classes = [permissions.IsAdminUser]

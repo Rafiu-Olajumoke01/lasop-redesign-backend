@@ -100,6 +100,7 @@ class ClassSession(models.Model):
 
     class Meta:
         ordering = ['-date', '-start_time']
+        unique_together = ('cohort', 'date')
 
     def __str__(self):
         return f"{self.cohort.name} — {self.date}"
