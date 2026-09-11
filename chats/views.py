@@ -1,3 +1,4 @@
+import cloudinary.uploader
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, permissions, status
@@ -67,3 +68,27 @@ class MarkConversationReadView(APIView):
         participant.last_read_at = timezone.now()
         participant.save(update_fields=['last_read_at'])
         return Response({'status': 'ok'})
+
+
+class UploadAttachmentView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        file = request.FILES.get('file')
+        if not file:
+            return Response({'error': 'No file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        image_extensions = ('.jpg', '.jpeg', '.png', '.gif', '.webp')
+        is_image = file.name.lower().endswith(image_extensions)
+
+        result = cloudinary.uploader.upload(
+            file,
+            resource_type='image' if is_image else 'raw',
+            folder='lasop_chat_attachments',
+        )
+
+        return Response({
+            'attachment_url': result['secure_url'],
+            'attachment_name': file.name,
+            'message_type': 'image' if is_image else 'document',
+        })
