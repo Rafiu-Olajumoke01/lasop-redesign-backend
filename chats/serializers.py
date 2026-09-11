@@ -26,7 +26,11 @@ def get_user_role(user_id):
 class MessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
-        fields = ['id', 'conversation', 'sender_id', 'sender_name', 'content', 'created_at', 'edited_at']
+        fields = [
+            'id', 'conversation', 'sender_id', 'sender_name', 'content',
+            'message_type', 'attachment_url', 'attachment_name',
+            'created_at', 'edited_at',
+        ]
         read_only_fields = ['id', 'sender_id', 'sender_name', 'created_at', 'edited_at']
 
 

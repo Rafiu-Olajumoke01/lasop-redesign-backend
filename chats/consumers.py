@@ -29,10 +29,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data):
         data = json.loads(text_data)
         content = data.get('content', '').strip()
-        if not content:
+        message_type = data.get('message_type', 'text')
+        attachment_url = data.get('attachment_url')
+        attachment_name = data.get('attachment_name', '')
+
+        # a message needs either text or an attachment — not neither
+        if not content and not attachment_url:
             return
 
-        message = await self.save_message(content)
+        message = await self.save_message(content, message_type, attachment_url, attachment_name)
 
         await self.channel_layer.group_send(
             self.room_group_name,
@@ -42,6 +47,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'sender_id': self.user.id,
                 'sender_name': self.user.get_full_name() or self.user.get_username(),
                 'content': message.content,
+                'message_type': message.message_type,
+                'attachment_url': message.attachment_url,
+                'attachment_name': message.attachment_name,
                 'created_at': message.created_at.isoformat(),
             }
         )
@@ -53,6 +61,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'sender_id': event['sender_id'],
             'sender_name': event['sender_name'],
             'content': event['content'],
+            'message_type': event['message_type'],
+            'attachment_url': event['attachment_url'],
+            'attachment_name': event['attachment_name'],
             'created_at': event['created_at'],
         }))
 
@@ -64,7 +75,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         ).exists()
 
     @database_sync_to_async
-    def save_message(self, content):
+    def save_message(self, content, message_type='text', attachment_url=None, attachment_name=''):
         from .models import Conversation, Message
         conversation = Conversation.objects.get(id=self.conversation_id)
         message = Message.objects.create(
@@ -72,6 +83,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             sender_id=self.user.id,
             sender_name=self.user.get_full_name() or self.user.get_username(),
             content=content,
+            message_type=message_type,
+            attachment_url=attachment_url,
+            attachment_name=attachment_name,
         )
         Conversation.objects.filter(id=self.conversation_id).update(updated_at=timezone.now())
         return message

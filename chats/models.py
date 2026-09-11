@@ -38,10 +38,22 @@ class ConversationParticipant(models.Model):
 
 
 class Message(models.Model):
+    TEXT = 'text'
+    IMAGE = 'image'
+    DOCUMENT = 'document'
+    MESSAGE_TYPE_CHOICES = [
+        (TEXT, 'Text'),
+        (IMAGE, 'Image'),
+        (DOCUMENT, 'Document'),
+    ]
+
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='messages')
     sender_id = models.IntegerField()
     sender_name = models.CharField(max_length=255)
-    content = models.TextField()
+    content = models.TextField(blank=True)
+    message_type = models.CharField(max_length=10, choices=MESSAGE_TYPE_CHOICES, default=TEXT)
+    attachment_url = models.URLField(null=True, blank=True)
+    attachment_name = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     edited_at = models.DateTimeField(null=True, blank=True)
 

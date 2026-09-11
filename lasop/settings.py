@@ -55,6 +55,15 @@ INSTALLED_APPS = [
 if ENABLE_CHAT:
     INSTALLED_APPS = ['daphne', 'channels'] + INSTALLED_APPS + ['chats']
 
+if ENABLE_CHAT:
+    import cloudinary
+    cloudinary.config(
+        cloud_name=os.environ.get('CLOUDINARY_CLOUD_NAME'),
+        api_key=os.environ.get('CLOUDINARY_API_KEY'),
+        api_secret=os.environ.get('CLOUDINARY_API_SECRET'),
+        secure=True,
+    )
+
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
