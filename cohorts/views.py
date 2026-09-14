@@ -864,10 +864,11 @@ class AdminCohortChatRosterView(APIView):
             seen.add(student.id)
             full_name = f"{student.first_name} {student.last_name}".strip()
             participants.append({
-                'id': student.id,
-                'username': student.email,
-                'full_name': full_name or student.email,
-            })
+             'id': student.id,
+             'username': student.email,
+             'full_name': full_name or student.email,
+             'email': student.email,
+})
 
         return Response({
             'cohort_id': cohort.id,
