@@ -4,9 +4,11 @@ from django.db import models
 class Conversation(models.Model):
     DIRECT = 'direct'
     GROUP = 'group'
+    BROADCAST = 'broadcast'
     TYPE_CHOICES = [
         (DIRECT, 'Direct'),
         (GROUP, 'Group'),
+        (BROADCAST, 'Broadcast'),
     ]
 
     conversation_type = models.CharField(max_length=10, choices=TYPE_CHOICES, default=DIRECT)
