@@ -20,11 +20,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         self.room_group_name = f'chat_{self.conversation_id}'
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+        await self.set_online_status(True)
         await self.accept()
 
     async def disconnect(self, close_code):
         if hasattr(self, 'room_group_name'):
             await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+        if hasattr(self, 'user') and self.user and self.user.is_authenticated:
+            await self.set_online_status(False)
 
     async def receive(self, text_data):
         data = json.loads(text_data)
@@ -38,6 +41,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return
 
         message = await self.save_message(content, message_type, attachment_url, attachment_name)
+        await self.notify_offline_participants(message)
 
         await self.channel_layer.group_send(
             self.room_group_name,
@@ -75,6 +79,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
         ).exists()
 
     @database_sync_to_async
+    def set_online_status(self, is_online):
+        from .models import ConversationParticipant
+        ConversationParticipant.objects.filter(
+            conversation_id=self.conversation_id, user_id=self.user.id
+        ).update(is_online=is_online)
+
+    @database_sync_to_async
     def save_message(self, content, message_type='text', attachment_url=None, attachment_name=''):
         from .models import Conversation, Message
         conversation = Conversation.objects.get(id=self.conversation_id)
@@ -89,3 +100,25 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
         Conversation.objects.filter(id=self.conversation_id).update(updated_at=timezone.now())
         return message
+
+    @database_sync_to_async
+    def notify_offline_participants(self, message):
+        from django.conf import settings
+        from django.core.mail import send_mail
+        from .models import ConversationParticipant
+
+        offline_participants = ConversationParticipant.objects.filter(
+            conversation_id=self.conversation_id,
+            is_online=False,
+        ).exclude(user_id=self.user.id)
+
+        for participant in offline_participants:
+            if not participant.email:
+                continue
+            send_mail(
+                subject=f'New message from {message.sender_name} on LASOP',
+                message=f'{message.sender_name} sent you a message:\n\n{message.content}\n\nLog in to LASOP to reply.',
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[participant.email],
+                fail_silently=True,
+            )

@@ -75,6 +75,7 @@ class ParticipantInputSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     username = serializers.CharField()
     full_name = serializers.CharField(required=False, allow_blank=True)
+    email = serializers.EmailField(required=False, allow_blank=True)
 
 
 class ConversationCreateSerializer(serializers.Serializer):
@@ -110,6 +111,7 @@ class ConversationCreateSerializer(serializers.Serializer):
             'id': request.user.id,
             'username': request.user.username,
             'full_name': getattr(request.user, 'full_name', request.user.username),
+            'email': getattr(request.user, 'email', ''),
         }
 
         conversation_type = validated_data.get('conversation_type', Conversation.DIRECT)
@@ -137,6 +139,7 @@ class ConversationCreateSerializer(serializers.Serializer):
                 user_id=p['id'],
                 username=p['username'],
                 full_name=p.get('full_name', ''),
+                email=p.get('email', ''),
             )
             for p in participants_data.values()
         ])
