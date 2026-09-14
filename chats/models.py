@@ -27,8 +27,10 @@ class ConversationParticipant(models.Model):
     user_id = models.IntegerField()
     username = models.CharField(max_length=150)
     full_name = models.CharField(max_length=255, blank=True)
+    email = models.EmailField(blank=True)
     joined_at = models.DateTimeField(auto_now_add=True)
     last_read_at = models.DateTimeField(null=True, blank=True)
+    is_online = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ('conversation', 'user_id')

@@ -8,13 +8,15 @@ class SimpleUser:
     from JWT token claims. Used because this service has no access to
     the real Users table (it lives in a different database)."""
 
-    def __init__(self, user_id, username, full_name, is_tutor, is_staff):
+    def __init__(self, user_id, username, full_name, is_tutor, is_staff, email=''):
         self.id = user_id
         self.username = username
         self.full_name = full_name
         self.is_tutor = is_tutor
         self.is_staff = is_staff
+        self.email = email
         self.is_authenticated = True
+
 
     def get_full_name(self):
         return self.full_name or self.username
@@ -45,5 +47,7 @@ class TokenClaimsAuthentication(BaseAuthentication):
             full_name=access_token.get('full_name', ''),
             is_tutor=access_token.get('is_tutor', False),
             is_staff=access_token.get('is_staff', False),
+            email=access_token.get('email', ''),
         )
+        
         return (user, None)

@@ -24,6 +24,7 @@ class RegisterView(APIView):
             refresh['full_name'] = f"{user.first_name} {user.last_name}".strip()
             refresh['is_tutor'] = user.is_tutor
             refresh['is_staff'] = user.is_staff
+            refresh['email'] = user.email
 
             return Response({
                 'message': 'Account created successfully',
@@ -45,6 +46,7 @@ class LoginView(APIView):
             refresh['full_name'] = f"{user.first_name} {user.last_name}".strip()
             refresh['is_tutor'] = user.is_tutor
             refresh['is_staff'] = user.is_staff
+            refresh['email'] = user.email
 
             return Response({
                 'refresh': str(refresh),

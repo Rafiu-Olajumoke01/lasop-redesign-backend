@@ -30,6 +30,7 @@ class JWTAuthMiddleware(BaseMiddleware):
                 full_name=access_token.get('full_name', ''),
                 is_tutor=access_token.get('is_tutor', False),
                 is_staff=access_token.get('is_staff', False),
+                email=access_token.get('email', ''),
             )
         except Exception:
             return AnonymousSimpleUser()
