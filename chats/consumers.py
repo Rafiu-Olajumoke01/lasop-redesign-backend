@@ -105,7 +105,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def notify_offline_participants(self, message):
         import logging
         from django.conf import settings
-        from django.core.mail import send_mail
         from .models import ConversationParticipant
 
         logger = logging.getLogger(__name__)
@@ -115,16 +114,47 @@ class ChatConsumer(AsyncWebsocketConsumer):
             is_online=False,
         ).exclude(user_id=self.user.id)
 
+        from django.core.mail import EmailMultiAlternatives
+
         for participant in offline_participants:
             if not participant.email:
                 continue
             try:
-                send_mail(
-                    subject=f'New message from {message.sender_name} on LASOP',
-                    message=f'{message.sender_name} sent you a message:\n\n{message.content}\n\nLog in to LASOP to reply.',
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[participant.email],
-                    fail_silently=False,
+                subject = f'{message.sender_name} sent you a message on LASOP'
+                text_body = (
+                    f'{message.sender_name} sent you a message:\n\n'
+                    f'{message.content}\n\n'
+                    f'Log in to LASOP to reply: {settings.FRONTEND_URL}'
                 )
+                html_body = f'''
+                <div style="background:#f0f2f5; padding:32px 16px; font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;">
+                  <div style="max-width:480px; margin:0 auto; background:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+                    <div style="background:#2563eb; padding:24px 28px;">
+                      <span style="color:#ffffff; font-size:18px; font-weight:700; letter-spacing:0.3px;">LASOP</span>
+                    </div>
+                    <div style="padding:28px;">
+                      <p style="margin:0 0 4px; color:#6b7280; font-size:13px; text-transform:uppercase; letter-spacing:0.5px;">New message</p>
+                      <h2 style="margin:0 0 16px; color:#111827; font-size:20px;">{message.sender_name}</h2>
+                      <div style="background:#f9fafb; border-left:3px solid #2563eb; padding:14px 16px; border-radius:8px; color:#374151; font-size:15px; line-height:1.5;">
+                        {message.content}
+                      </div>
+                      <a href="{settings.FRONTEND_URL}" style="display:inline-block; margin-top:24px; background:#2563eb; color:#ffffff; padding:12px 24px; border-radius:8px; text-decoration:none; font-size:14px; font-weight:600;">
+                        Log in to reply
+                      </a>
+                    </div>
+                    <div style="padding:16px 28px; background:#f9fafb; border-top:1px solid #f0f0f0;">
+                      <p style="margin:0; color:#9ca3af; font-size:12px;">You're receiving this because you're offline on LASOP. Log in to keep the conversation going.</p>
+                    </div>
+                  </div>
+                </div>
+                '''
+                email = EmailMultiAlternatives(
+                    subject=subject,
+                    body=text_body,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    to=[participant.email],
+                )
+                email.attach_alternative(html_body, "text/html")
+                email.send(fail_silently=False)
             except Exception:
                 logger.exception(f'Failed to send chat notification email to {participant.email}')
