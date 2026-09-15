@@ -103,9 +103,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def notify_offline_participants(self, message):
+        import logging
         from django.conf import settings
         from django.core.mail import send_mail
         from .models import ConversationParticipant
+
+        logger = logging.getLogger(__name__)
 
         offline_participants = ConversationParticipant.objects.filter(
             conversation_id=self.conversation_id,
@@ -115,10 +118,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
         for participant in offline_participants:
             if not participant.email:
                 continue
-            send_mail(
-                subject=f'New message from {message.sender_name} on LASOP',
-                message=f'{message.sender_name} sent you a message:\n\n{message.content}\n\nLog in to LASOP to reply.',
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[participant.email],
-                fail_silently=False,
-            )
+            try:
+                send_mail(
+                    subject=f'New message from {message.sender_name} on LASOP',
+                    message=f'{message.sender_name} sent you a message:\n\n{message.content}\n\nLog in to LASOP to reply.',
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[participant.email],
+                    fail_silently=False,
+                )
+            except Exception:
+                logger.exception(f'Failed to send chat notification email to {participant.email}')
