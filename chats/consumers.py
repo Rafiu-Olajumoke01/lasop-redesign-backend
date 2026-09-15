@@ -120,5 +120,5 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 message=f'{message.sender_name} sent you a message:\n\n{message.content}\n\nLog in to LASOP to reply.',
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[participant.email],
-                fail_silently=True,
+                fail_silently=False,
             )
