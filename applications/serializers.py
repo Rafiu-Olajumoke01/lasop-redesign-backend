@@ -43,13 +43,20 @@ class ApplicationSerializer(serializers.ModelSerializer):
         return obj._latest_payment_cache
 
     def get_payment_status(self, obj):
-        payment = self._latest_payment(obj)
-        if not payment:
-            return 'not_started'
-        if payment.status == payment.Status.PAID:
+        amount_paid = self.get_amount_paid(obj)
+        amount_paid = float(amount_paid) if amount_paid else 0
+        fee = float(obj.course.fee)
+
+        if fee > 0 and amount_paid >= fee:
             return 'paid'
-        if payment.status == payment.Status.AWAITING_CONFIRMATION:
+
+        payment = self._latest_payment(obj)
+        if payment and payment.status == payment.Status.AWAITING_CONFIRMATION:
             return 'in_review'
+
+        if amount_paid > 0:
+            return 'partially_paid'
+
         return 'not_started'
 
     def get_amount_paid(self, obj):
