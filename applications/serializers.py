@@ -53,10 +53,17 @@ class ApplicationSerializer(serializers.ModelSerializer):
         return 'not_started'
 
     def get_amount_paid(self, obj):
-        payment = self._latest_payment(obj)
-        if not payment or payment.status != payment.Status.PAID:
-            return None
-        return str(payment.confirmed_amount or payment.amount)
+        from django.db.models import Sum, F
+        from .models import Payment as PaymentModel
+        total = obj.payments.filter(status=PaymentModel.Status.PAID).aggregate(
+            total=Sum(F('confirmed_amount'))
+        )['total']
+        if total is None:
+            # fall back to `amount` for any paid rows that never got a confirmed_amount set
+            total = obj.payments.filter(status=PaymentModel.Status.PAID).aggregate(
+                total=Sum(F('amount'))
+            )['total']
+        return str(total) if total else None
 
     def get_payment(self, obj):
         payment = self._latest_payment(obj)
