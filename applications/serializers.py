@@ -61,7 +61,7 @@ class ApplicationSerializer(serializers.ModelSerializer):
 
     def get_amount_paid(self, obj):
         from django.db.models import Sum, F
-        from .models import Payment as PaymentModel
+        from payments.models import Payment as PaymentModel
         total = obj.payments.filter(status=PaymentModel.Status.PAID).aggregate(
             total=Sum(F('confirmed_amount'))
         )['total']
