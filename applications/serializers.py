@@ -45,7 +45,7 @@ class ApplicationSerializer(serializers.ModelSerializer):
     def get_payment_status(self, obj):
         amount_paid = self.get_amount_paid(obj)
         amount_paid = float(amount_paid) if amount_paid else 0
-        fee = float(obj.course.fee)
+        fee = float(obj.course.fee) if obj.course else 0
 
         if fee > 0 and amount_paid >= fee:
             return 'paid'
