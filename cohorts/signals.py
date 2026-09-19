@@ -2,7 +2,53 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.core.mail import EmailMultiAlternatives
 from django.conf import settings
+from django.template.defaultfilters import linebreaksbr
+from django.utils.html import escape
 from .models import Assessment
+
+
+def _label_html(text):
+    return (
+        f'<p style="margin:0 0 4px; color:#111827; font-size:13px; font-weight:600; '
+        f'text-transform:uppercase; letter-spacing:0.5px;">{escape(text)}</p>'
+    )
+
+
+def _plain_section_html(title, body):
+    """A simple label + text block (used for 'Assessed on')."""
+    return f"""
+                    {_label_html(title)}
+                    <p style="margin:0 0 20px; color:#374151; font-size:15px; line-height:1.6;">{linebreaksbr(body)}</p>
+    """
+
+
+def _boxed_section_html(title, blocks):
+    """
+    A highlighted block with a blue left border.
+    `blocks` is a list of (sub_heading_or_None, text) tuples.
+    """
+    inner = ""
+    for sub_heading, text in blocks:
+        if sub_heading:
+            inner += (
+                f'<p style="margin:12px 0 2px; color:#2563eb; font-size:12px; font-weight:700; '
+                f'text-transform:uppercase; letter-spacing:0.4px;">{escape(sub_heading)}</p>'
+            )
+        inner += (
+            f'<p style="margin:0; color:#111827; font-size:15px; line-height:1.6;">'
+            f'{linebreaksbr(text)}</p>'
+        )
+
+    return f"""
+                    <table role="presentation" width="100%" style="background-color:#f9fafb; border-left:4px solid #2563eb; border-radius:6px; margin:0 0 20px;">
+                      <tr>
+                        <td style="padding:16px 20px;">
+                          {_label_html(title)}
+                          {inner}
+                        </td>
+                      </tr>
+                    </table>
+    """
 
 
 @receiver(post_save, sender=Assessment)
@@ -21,7 +67,7 @@ def notify_guardian_of_assessment(sender, instance, created, **kwargs):
     guardian_name = student.guardian_name or "Guardian"
     date_str = instance.created_at.strftime("%d %B %Y")
 
-    # Get the student's current cohort name (same lookup pattern as AssessmentSerializer)
+    # Current cohort name (same lookup pattern as AssessmentSerializer)
     app = student.applications.filter(cohort__isnull=False).order_by('-created_at').first()
     cohort_name = app.cohort.name if app else None
 
@@ -30,10 +76,22 @@ def notify_guardian_of_assessment(sender, instance, created, **kwargs):
     else:
         tutor_intro = f"{tutor_name}"
 
+    # ------------------------------------------------------------------
+    # Content for the three sections.
+    # NOTE: adjust these field names if your Assessment model uses
+    # different ones. Missing/empty fields are simply left out of the email.
+    # ------------------------------------------------------------------
+    assessed_on = str(instance.assessed_on) if instance.assessed_on else ""
+    observation = getattr(instance, "tutor_observation", "") or ""
+    recommendations = getattr(instance, "tutor_recommendations", "") or ""
+    tutor_response = getattr(instance, "tutor_response", "") or ""
+
     # Convert the 1-5 rating into a percentage score, e.g. 4 -> 80%
     rating_percent = instance.rating * 20 if instance.rating else None
 
-    # HTML snippet for the rating — a colored badge, empty string if no rating was set
+    # ------------------------------------------------------------------
+    # Rating badge (HTML)
+    # ------------------------------------------------------------------
     rating_html = ""
     if rating_percent:
         if rating_percent >= 80:
@@ -44,7 +102,7 @@ def notify_guardian_of_assessment(sender, instance, created, **kwargs):
             badge_bg, badge_text, badge_border = "#fef2f2", "#dc2626", "#fecaca"
 
         rating_html = f"""
-                    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:16px 0 0;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
                       <tr>
                         <td style="background-color:{badge_bg}; border:1px solid {badge_border}; border-radius:999px; padding:6px 16px;">
                           <span style="color:{badge_text}; font-size:14px; font-weight:700; letter-spacing:0.2px;">{rating_percent}%</span>
@@ -54,30 +112,53 @@ def notify_guardian_of_assessment(sender, instance, created, **kwargs):
                     </table>
         """
 
-    # Optional tutor observation — only show if the tutor actually filled it in
-    observation_text_block = (
-        f"Tutor's observation: {instance.tutor_observation}\n\n"
-        if instance.tutor_observation else ""
+    # ------------------------------------------------------------------
+    # Section 1: Assessed on
+    # ------------------------------------------------------------------
+    assessed_on_html = _plain_section_html("Assessed on", assessed_on) if assessed_on else ""
+    assessed_on_text = f"ASSESSED ON\n{assessed_on}\n\n" if assessed_on else ""
+
+    # ------------------------------------------------------------------
+    # Section 2: Tutor's observations and recommendations
+    # ------------------------------------------------------------------
+    obs_blocks = []
+    if observation:
+        obs_blocks.append(("Observations", observation))
+    if recommendations:
+        obs_blocks.append(("Recommendations", recommendations))
+
+    observations_html = (
+        _boxed_section_html("Tutor's Observations & Recommendations", obs_blocks)
+        if obs_blocks else ""
     )
-    observation_html_block = (
-        f"""
-                    <p style="margin:16px 0 0; color:#374151; font-size:14px; line-height:1.6;">
-                      <strong>Tutor's observation:</strong> {instance.tutor_observation}
-                    </p>
-        """
-        if instance.tutor_observation else ""
+    observations_text = ""
+    if obs_blocks:
+        observations_text = "TUTOR'S OBSERVATIONS & RECOMMENDATIONS\n"
+        for sub_heading, text in obs_blocks:
+            observations_text += f"{sub_heading}: {text}\n"
+        observations_text += "\n"
+
+    # ------------------------------------------------------------------
+    # Section 3: Tutor's response
+    # ------------------------------------------------------------------
+    response_html = (
+        _boxed_section_html("Tutor's Response", [(None, tutor_response)])
+        if tutor_response else ""
     )
+    response_text = f"TUTOR'S RESPONSE\n{tutor_response}\n\n" if tutor_response else ""
+
+    rating_text = f"PERFORMANCE SCORE\n{rating_percent}%\n\n" if rating_percent else ""
 
     subject = f"New Assessment for {student_name}"
 
     # Plain text fallback (for email clients that don't render HTML)
     text_body = (
         f"Hi {guardian_name},\n\n"
-        f"{tutor_intro} just posted a new assessment for {student_name} on {date_str}:\n\n"
-        f"Assessed on: {instance.assessed_on}\n\n"
-        f"Student's answer to the question asked: \"{instance.student_answer}\"\n\n"
-        f"{observation_text_block}"
-        f"{f'Performance score: {rating_percent}%' + chr(10) + chr(10) if rating_percent else ''}"
+        f"{tutor_intro} just posted a new assessment for {student_name} on {date_str}.\n\n"
+        f"{assessed_on_text}"
+        f"{observations_text}"
+        f"{response_text}"
+        f"{rating_text}"
         f"— LASOP"
     )
 
@@ -101,29 +182,19 @@ def notify_guardian_of_assessment(sender, instance, created, **kwargs):
                 <tr>
                   <td style="padding:32px;">
                     <p style="margin:0 0 4px; color:#111827; font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">New Assessment</p>
-                    <h1 style="margin:0 0 16px; color:#111827; font-size:22px; font-weight:700;">{student_name}</h1>
+                    <h1 style="margin:0 0 16px; color:#111827; font-size:22px; font-weight:700;">{escape(student_name)}</h1>
 
                     <p style="margin:0 0 20px; color:#374151; font-size:15px; line-height:1.5;">
-                      Hi {guardian_name}, <strong>{tutor_intro}</strong> shared a new assessment for {student_name} on {date_str}.
+                      Hi {escape(guardian_name)}, <strong>{escape(tutor_intro)}</strong> shared a new assessment for {escape(student_name)} on {date_str}.
                     </p>
 
-                    <p style="margin:0 0 4px; color:#111827; font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Assessed on</p>
-                    <p style="margin:0 0 16px; color:#374151; font-size:15px; line-height:1.5;">{instance.assessed_on}</p>
-
-                    <table role="presentation" width="100%" style="background-color:#f9fafb; border-left:4px solid #2563eb; border-radius:6px;">
-                      <tr>
-                        <td style="padding:16px 20px;">
-                          <p style="margin:0 0 4px; color:#111827; font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Student's answer to the question asked</p>
-                          <p style="margin:0; color:#111827; font-size:15px; line-height:1.6; font-style:italic;">
-                            &ldquo;{instance.student_answer}&rdquo;
-                          </p>
-                        </td>
-                      </tr>
-                    </table>
-                    {observation_html_block}
+                    {assessed_on_html}
+                    {observations_html}
+                    {response_html}
                     {rating_html}
+
                     <p style="margin:24px 0 0; color:#9ca3af; font-size:13px; line-height:1.5;">
-                      This is an automated notification from LASOP. You're receiving this because you're listed as the guardian for {student_name}.
+                      This is an automated notification from LASOP. You're receiving this because you're listed as the guardian for {escape(student_name)}.
                     </p>
                   </td>
                 </tr>
