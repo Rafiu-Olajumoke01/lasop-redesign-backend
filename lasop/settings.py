@@ -12,8 +12,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get('SECRET_KEY')
-import hashlib
-print(f"SECRET_KEY hash at boot: {hashlib.md5(SECRET_KEY.encode()).hexdigest()}", flush=True)
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
@@ -50,6 +48,7 @@ INSTALLED_APPS = [
     'results',
     'tutors',
     'certificate',
+    'guests',
 ]
 
 if ENABLE_CHAT:
