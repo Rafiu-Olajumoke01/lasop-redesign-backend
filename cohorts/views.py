@@ -122,12 +122,18 @@ class TutorClassSessionListCreateView(generics.ListCreateAPIView):
         return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
-        # NOTE: started_at is intentionally NOT set here anymore.
-        # The official "class begun" timestamp is the moment the tutor
-        # submits attendance (see BulkAttendanceView below), not the
-        # moment the session record is created.
         tutor = self.request.user.tutor_profile
-        serializer.save(tutor=tutor)
+        cohort = serializer.validated_data['cohort']
+        date = serializer.validated_data['date']
+        day = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'][date.weekday()]
+        slot = (cohort.class_times or {}).get(day)
+        if not slot:
+            raise ValidationError({'detail': f'{cohort.name} has no scheduled class time for this day.'})
+        serializer.save(
+            tutor=tutor,
+            start_time=datetime.strptime(slot['start'], '%H:%M').time(),
+            end_time=datetime.strptime(slot['end'], '%H:%M').time(),
+        )
 
 class SessionRosterView(APIView):
     permission_classes = [IsTutor]
@@ -154,6 +160,8 @@ class BulkAttendanceView(APIView):
 
     def post(self, request, session_id):
         session = get_object_or_404(ClassSession, id=session_id, tutor__user=request.user)
+        if not session.started_at and timezone.now() >= session.scheduled_end:
+            return Response({'detail': 'The scheduled time for this class has ended.'}, status=400)
         records = request.data.get('records', [])
         created = []
         for r in records:
@@ -216,6 +224,7 @@ class AdminCohortsTodayView(APIView):
 
         data = []
         for session in sessions_today:
+            session.auto_close_if_due()
             attendance_taken = session.attendance_records.exists()
             data.append({
                 'cohort_id': session.cohort_id,
@@ -337,6 +346,7 @@ class AdminCohortDetailView(APIView):
             'start_date': cohort.start_date,
             'end_date': cohort.end_date,
             'class_days': cohort.class_days,
+            'class_times': cohort.class_times,
             'current_stage_label': cohort.current_stage_label,
             'tutor_name': tutor_name,
             'student_counts': {
@@ -365,9 +375,10 @@ class StopClassSessionView(APIView):
 
     def post(self, request, session_id):
         session = get_object_or_404(ClassSession, id=session_id, tutor__user=request.user)
+        session.auto_close_if_due()
         if session.ended_at:
             return Response({'detail': 'This session has already been stopped.'}, status=400)
-        session.ended_at = timezone.now()
+        session.ended_at = min(timezone.now(), session.scheduled_end)
         session.end_latitude = request.data.get('latitude') or None
         session.end_longitude = request.data.get('longitude') or None
         session.save(update_fields=['ended_at', 'end_latitude', 'end_longitude'])
