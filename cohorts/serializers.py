@@ -22,6 +22,7 @@ class CohortSerializer(serializers.ModelSerializer):
             'tutor',
             'tutor_name',
             'class_days',
+            'class_times',
             'student_count',
             'current_stage',
             'current_stage_label',
@@ -30,6 +31,22 @@ class CohortSerializer(serializers.ModelSerializer):
             'created_at',
         ]
         read_only_fields = ['id', 'created_at']
+
+    def validate(self, attrs):
+        if 'class_days' in attrs or 'class_times' in attrs:
+            days = attrs.get('class_days', getattr(self.instance, 'class_days', []))
+            times = attrs.get('class_times', getattr(self.instance, 'class_times', {})) or {}
+            cleaned = {}
+            for d in days:
+                slot = times.get(d) or {}
+                start, end = slot.get('start'), slot.get('end')
+                if not start or not end:
+                    raise serializers.ValidationError({'class_times': f'Set a start and end time for {d}.'})
+                if start >= end:
+                    raise serializers.ValidationError({'class_times': f'End time must be after start time for {d}.'})
+                cleaned[d] = {'start': start, 'end': end}
+            attrs['class_times'] = cleaned
+        return attrs
 
     def get_tutor_name(self, obj):
         if obj.tutor and obj.tutor.user:
@@ -55,7 +72,11 @@ class ClassSessionSerializer(serializers.ModelSerializer):
             'end_latitude', 'end_longitude', 'attendance_marked', 'created_at',
         ]
         extra_kwargs = {'tutor': {'required': False}}
-        read_only_fields = ['started_at', 'ended_at', 'start_latitude', 'start_longitude', 'end_latitude', 'end_longitude']
+        read_only_fields = ['start_time', 'end_time', 'started_at', 'ended_at', 'start_latitude', 'start_longitude', 'end_latitude', 'end_longitude']
+    def to_representation(self, obj):
+        obj.auto_close_if_due()
+        return super().to_representation(obj)
+
     def get_attendance_marked(self, obj):
         return Attendance.objects.filter(session=obj).exists()
 

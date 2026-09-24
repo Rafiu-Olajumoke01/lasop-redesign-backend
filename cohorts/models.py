@@ -25,6 +25,7 @@ class Cohort(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='upcoming')
     tutor = models.ForeignKey('tutors.Tutor', on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_cohorts')
     class_days = models.JSONField(default=list, blank=True)
+    class_times = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -122,6 +123,16 @@ class ClassSession(models.Model):
     @property
     def is_in_progress(self):
         return bool(self.started_at) and not self.ended_at
+
+    @property
+    def scheduled_end(self):
+        from datetime import datetime
+        return timezone.make_aware(datetime.combine(self.date, self.end_time))
+
+    def auto_close_if_due(self):
+        if self.started_at and not self.ended_at and timezone.now() >= self.scheduled_end:
+            self.ended_at = self.scheduled_end
+            self.save(update_fields=['ended_at'])
 
     @property
     def roster(self):

@@ -25,6 +25,8 @@ from rest_framework.exceptions import PermissionDenied
 from .models import StudentProject
 from .serializers import StudentProjectSerializer
 from itertools import chain
+from datetime import datetime
+from rest_framework.exceptions import ValidationError
 
 
 def is_tutor_assigned_to_student(tutor_profile, student):
