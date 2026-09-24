@@ -20,10 +20,9 @@ ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',')
 PAYSTACK_SECRET_KEY = os.environ.get('PAYSTACK_SECRET_KEY', '')
 PAYSTACK_PUBLIC_KEY = os.environ.get('PAYSTACK_PUBLIC_KEY', '')
 
-# Set to True only on the Render chat service. Left unset (False) on
-# cPanel, which has no chat-related packages installed and no access
-# to this service's separate chat database.
 ENABLE_CHAT = os.environ.get('ENABLE_CHAT', 'False') == 'True'
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 # Application definition
