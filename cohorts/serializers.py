@@ -141,6 +141,12 @@ class StudentProjectSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'student', 'status', 'tutor_feedback', 'is_featured', 'submitted_at', 'created_at', 'updated_at']
 
+    def get_student_name(self, obj):
+        s = obj.student
+        full = f"{s.first_name} {s.last_name}".strip()
+        return full or s.email
+
+
 class PublicStudentProjectSerializer(serializers.ModelSerializer):
     student_name = serializers.SerializerMethodField()
     tech_stack_list = serializers.SerializerMethodField()
