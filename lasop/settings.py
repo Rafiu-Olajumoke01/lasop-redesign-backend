@@ -197,3 +197,8 @@ EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'no-reply@lasop.net')
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://lasop.net')
+
+REPLY_EMAIL_HOST = os.environ.get('REPLY_EMAIL_HOST', 'server60.web-hosting.com')
+REPLY_EMAIL_IMAP_PORT = int(os.environ.get('REPLY_EMAIL_IMAP_PORT', 993))
+REPLY_EMAIL_HOST_USER = os.environ.get('REPLY_EMAIL_HOST_USER', '')
+REPLY_EMAIL_HOST_PASSWORD = os.environ.get('REPLY_EMAIL_HOST_PASSWORD', '')
